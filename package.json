@@ -1,0 +1,7 @@
+{
+  "name": "zgob-apparel",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Zgob Apparel — static storefront (Supabase) + Vercel serverless functions for Printful mockup generation."
+}

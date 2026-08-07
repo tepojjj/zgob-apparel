@@ -1,521 +1,582 @@
-/* =========================================================
-   ZGOB APPAREL — design tokens
-   Concept: a print shop's cutting table. Registration marks,
-   dashed cut-lines, hang-tags and stamped ink stand in for the
-   usual card/shadow vocabulary.
-   ========================================================= */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customize — Zgob Apparel</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
 
-@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="designs.html">Designs</a></li>
+      <li><a href="customize.html">Customize</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="admin.html">Admin</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+  </nav>
+</header>
 
-:root{
-  --ink:      #14120d;   /* primary dark surface */
-  --ink-2:    #1e1b14;   /* slightly lifted dark surface */
-  --canvas:   #ede6d6;   /* raw cotton canvas, light surface */
-  --chalk:    #f7f3e8;   /* lightest surface / text-on-dark */
-  --thread:   #d6432a;   /* registration red — primary accent / CTA */
-  --thread-dark: #ab331f;
-  --denim:    #3e5c74;   /* secondary accent */
-  --mustard:  #d4a017;   /* tag / warning accent */
-  --graphite: #8a8474;   /* muted text on dark */
-  --graphite-2: #6b6656; /* muted text on light */
-  --line:     rgba(237,230,214,0.16);
-  --line-dark:rgba(20,18,13,0.14);
+<main>
+  <section class="page-hero section-dark">
+    <div class="wrap">
+      <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Build your own</div>
+      <h1>Customize a garment</h1>
+      <p>Pick a base, drop in your design, and tell us where it goes. Submitting sends the order straight to our queue — we'll follow up by email to confirm the proof.</p>
+    </div>
+  </section>
 
-  --font-display: 'Archivo Black', 'Arial Black', sans-serif;
-  --font-body: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'Space Mono', 'Courier New', monospace;
+  <section class="section-dark" style="padding-top:50px;">
+    <div class="wrap customize-layout">
 
-  --max-w: 1180px;
-  --radius: 2px;
-}
+      <!-- LIVE PREVIEW -->
+      <div class="customize-preview-col">
+        <div class="garment-stage" style="min-height:420px;">
+          <span class="crosshair tl"></span><span class="crosshair tr"></span>
+          <span class="crosshair bl"></span><span class="crosshair br"></span>
+          <div id="previewGarment"></div>
+          <canvas id="templateCanvas" style="display:none;"></canvas>
+        </div>
+        <p class="graphite-text" id="templateDragHint" style="font-size:12px; margin-top:10px; display:none;">Drag the box to move it, drag the bottom-right corner to resize.</p>
+        <div class="card" style="margin-top:20px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">GARMENT</span>
+            <strong id="previewGarmentName">Classic Tee</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">COLOUR / SIZE</span>
+            <strong id="previewColorSize">Canvas / M</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">PLACEMENT</span>
+            <strong id="previewPlacement">Front, centered</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">EST. PRICE</span>
+            <strong id="previewPrice">$24.00</strong>
+          </div>
+          <div class="print-area-hint is-empty" id="printAreaHint">
+            <span class="dot"></span><span id="printAreaHintText">No design yet — add text or upload artwork below</span>
+          </div>
+        </div>
+      </div>
 
-*, *::before, *::after{ box-sizing: border-box; }
-html{ scroll-behavior: smooth; }
-body{
-  margin:0;
-  background: var(--ink);
-  color: var(--canvas);
-  font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-}
-img{ max-width:100%; display:block; }
-a{ color: inherit; }
-h1,h2,h3,h4{
-  font-family: var(--font-display);
-  line-height: 1.05;
-  margin: 0 0 .5em 0;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
-}
-p{ margin: 0 0 1em 0; }
-.wrap{ max-width: var(--max-w); margin: 0 auto; padding: 0 28px; }
+      <!-- FORM -->
+      <form id="customizeForm" novalidate>
+        <div class="callout" id="prefillNote" style="display:none; margin-bottom:26px;"></div>
 
-:focus-visible{
-  outline: 3px solid var(--thread);
-  outline-offset: 2px;
-}
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">Optional · Use your own product photo</h3>
+        <div class="form-field">
+          <label for="templateFile">Upload a photo of the actual garment (front-facing, plain background works best)</label>
+          <input type="file" id="templateFile" accept="image/*">
+          <p class="graphite-text" style="font-size:12px; margin-top:8px;">When you add a photo, we'll drop your design onto it instead of the sketch preview — drag it into place below. Leave this blank to use the standard preview.</p>
+          <p class="artwork-filename" id="templateFileName" style="display:none;"></p>
+          <button type="button" class="btn btn-small" id="clearTemplateBtn" style="display:none; margin-top:10px;">Remove photo, use standard preview</button>
+        </div>
 
-@media (prefers-reduced-motion: reduce){
-  *{ animation-duration: .001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
-}
+        <hr class="cut-line" style="margin: 26px 0;">
 
-/* ---------- utility: eyebrow / tag / mono label ---------- */
-.eyebrow{
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--thread);
-  display:flex;
-  align-items:center;
-  gap:10px;
-  margin-bottom: 14px;
-}
-.eyebrow::before{
-  content:"";
-  width: 10px; height: 10px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  flex: none;
-}
-.tag{
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  border: 1px solid currentColor;
-  padding: 3px 8px;
-  border-radius: var(--radius);
-  display: inline-block;
-}
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">01 · Garment</h3>
+        <div class="chip-group" id="garmentPicker" style="margin:14px 0 26px;"></div>
 
-/* registration crosshair — the signature mark, used at section corners */
-.crosshair{ position:relative; width:18px; height:18px; flex:none; }
-.crosshair::before,.crosshair::after{
-  content:"";
-  position:absolute; background: currentColor;
-}
-.crosshair::before{ left:50%; top:0; width:1.5px; height:100%; transform:translateX(-50%); }
-.crosshair::after{ top:50%; left:0; height:1.5px; width:100%; transform:translateY(-50%); }
-.crosshair-dot{ position:absolute; inset:0; margin:auto; width:3px;height:3px;border-radius:50%; background:currentColor; }
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">02 · Colour</h3>
+        <div class="swatch-picker" id="colorPicker" style="margin:14px 0 26px;"></div>
 
-.cut-line{
-  border: none;
-  border-top: 2px dashed var(--line);
-  margin: 0;
-}
-.cut-line.on-light{ border-top-color: var(--line-dark); }
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">03 · Size &amp; quantity</h3>
+        <div class="form-row" style="margin-bottom:26px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="size">Size</label>
+            <select id="size" required>
+              <option>S</option><option selected>M</option><option>L</option><option>XL</option><option>XXL</option>
+            </select>
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="quantity">Quantity</label>
+            <input type="number" id="quantity" min="1" max="500" value="1" required>
+          </div>
+        </div>
 
-/* ---------- buttons ---------- */
-.btn{
-  font-family: var(--font-mono);
-  font-size: 13px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  border: 2px solid var(--canvas);
-  background: transparent;
-  color: var(--canvas);
-  padding: 13px 24px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  display: inline-flex;
-  align-items:center;
-  gap: 10px;
-  text-decoration:none;
-  transition: transform .15s ease, background .15s ease, color .15s ease, border-color .15s ease;
-}
-.btn:hover{ transform: translateY(-2px); }
-.btn-primary{
-  background: var(--thread);
-  border-color: var(--thread);
-  color: var(--chalk);
-}
-.btn-primary:hover{ background: var(--thread-dark); border-color: var(--thread-dark); }
-.btn-dark{
-  border-color: var(--ink);
-  color: var(--ink);
-}
-.btn-block{ width:100%; justify-content:center; }
-.btn[disabled]{ opacity:.4; cursor:not-allowed; transform:none; }
-.btn-small{ padding: 8px 14px; font-size: 11px; }
-.btn-danger{ border-color: var(--thread); color: var(--thread); }
-.btn-danger:hover{ background: var(--thread); color: var(--chalk); }
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">04 · Your design</h3>
+        <div class="form-field">
+          <label for="designText">Text on garment (optional)</label>
+          <input type="text" id="designText" placeholder="e.g. ZGOB RUN CLUB" maxlength="24">
+        </div>
+        <div class="form-field">
+          <label for="artwork">Upload artwork (optional — PNG, JPG, SVG)</label>
+          <input type="file" id="artwork" accept="image/*">
+          <p class="graphite-text" style="font-size:12px; margin-top:8px;">Shows up in the preview on the left, and we'll review it before printing.</p>
+          <p class="artwork-filename" id="artworkFileName" style="display:none;"></p>
+        </div>
+        <div class="form-field">
+          <label for="placement">Placement</label>
+          <select id="placement">
+            <option>Front, centered</option>
+            <option>Left chest</option>
+            <option>Back, full</option>
+            <option>Sleeve</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="notes">Notes for the print team (optional)</label>
+          <textarea id="notes" placeholder="Colour matching, sizing across a team order, deadline, etc."></textarea>
+        </div>
 
-/* ---------- header / nav ---------- */
-.site-header{
-  position: sticky; top:0; z-index: 50;
-  background: rgba(20,18,13,0.92);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid var(--line);
-}
-.nav{
-  display:flex; align-items:center; justify-content:space-between;
-  padding: 18px 28px;
-  max-width: var(--max-w); margin:0 auto;
-}
-.logo{
-  font-family: var(--font-display);
-  font-size: 20px;
-  letter-spacing: 0.02em;
-  text-decoration:none;
-  color: var(--canvas);
-  display:flex; align-items:center; gap:10px;
-}
-.logo .stamp-mark{
-  width: 30px; height:30px;
-  border: 2px solid var(--thread);
-  border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  color: var(--thread);
-  font-size: 13px;
-  transform: rotate(-8deg);
-}
-.nav-links{
-  display:flex; gap: 6px;
-  list-style:none; margin:0; padding:0;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  text-transform:uppercase;
-  letter-spacing: 0.04em;
-}
-.nav-links a{
-  text-decoration:none;
-  color: var(--graphite);
-  padding: 10px 14px;
-  display:block;
-  border-radius: var(--radius);
-  transition: color .15s ease, background .15s ease;
-}
-.nav-links a:hover{ color: var(--canvas); }
-.nav-links a.active{ color: var(--ink); background: var(--canvas); }
-.nav-toggle{ display:none; }
+        <hr class="cut-line" style="margin: 34px 0;">
 
-@media (max-width: 820px){
-  .nav-links{
-    position:fixed; inset: 66px 0 0 0; height:auto;
-    flex-direction:column; background: var(--ink);
-    padding: 10px 20px 30px; gap:2px;
-    transform: translateY(-8px);
-    opacity:0; pointer-events:none;
-    transition: opacity .18s ease, transform .18s ease;
-    border-bottom: 1px solid var(--line);
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">05 · Your details</h3>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="fullName">Full name</label>
+            <input type="text" id="fullName" required>
+          </div>
+          <div class="form-field">
+            <label for="email">Email</label>
+            <input type="email" id="email" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:10px;">Submit custom order →</button>
+        <p class="graphite-text" style="font-size:12px; margin-top:12px; text-align:center;">No payment is collected here — we confirm pricing on the proof before charging.</p>
+      </form>
+
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <hr class="cut-line" style="margin-bottom:20px;">
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Zgob Apparel. All rights reserved.</span>
+      <a href="index.html" style="text-decoration:none;">Back to overview</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/garments.js"></script>
+<script src="js/main.js"></script>
+<script>
+(async () => {
+  const formEl = document.getElementById('customizeForm');
+  let GARMENTS = [];
+  try{
+    GARMENTS = await ZgobStore.getInventory(); // { id, name, category, price, sizes }
+  }catch(err){
+    formEl.innerHTML = '<div class="empty-state">Couldn\'t load garments — check js/config.js has your Supabase URL and key.</div>';
+    console.error(err);
+    return;
   }
-  .nav-links.open{ opacity:1; pointer-events:auto; transform:translateY(0); }
-  .nav-links a{ padding: 14px 10px; border-bottom: 1px dashed var(--line); }
-  .nav-toggle{
-    display:flex; flex-direction:column; gap:5px;
-    background:none; border:none; cursor:pointer; padding: 6px;
+  const COLORS = [
+    { name:'Canvas', hex:'#ede6d6' },
+    { name:'Ink', hex:'#14120d' },
+    { name:'Denim', hex:'#3e5c74' },
+    { name:'Thread Red', hex:'#d6432a' },
+    { name:'Mustard', hex:'#d4a017' },
+    { name:'Chalk', hex:'#f7f3e8' },
+  ];
+
+  let state = {
+    garment: GARMENTS[0],
+    color: COLORS[0],
+    text: '',
+    artworkUrl: null,
+    artworkImg: null,      // loaded Image for the uploaded artwork, used by the canvas compositor
+    templateUrl: null,     // uploaded product-photo URL, when set we render the canvas instead of the SVG
+    templateImg: null,     // loaded Image for that photo
+    box: { x: 0.32, y: 0.28, w: 0.36, h: 0.34 }, // design placement box, in fractions of the photo
+  };
+
+  function loadImage(url){
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
   }
-  .nav-toggle span{ width:22px; height:2px; background:var(--canvas); display:block; }
-}
 
-/* ---------- sections ---------- */
-section{ padding: 88px 0; }
-.section-dark{ background: var(--ink); color: var(--canvas); }
-.section-light{ background: var(--canvas); color: var(--ink); }
-.section-light .eyebrow{ color: var(--thread-dark); }
-.section-light .graphite-text{ color: var(--graphite-2); }
-.section-mustard{ background: var(--mustard); color: var(--ink); }
-.graphite-text{ color: var(--graphite); }
+  // approximate print-area box per placement, in the garment SVG's own 300x320 coordinate space
+  const PLACEMENT_BOXES = {
+    'Front, centered': { x:100, y:110, w:100, h:100 },
+    'Left chest':       { x:150, y:86,  w:44,  h:40  },
+    'Back, full':       { x:72,  y:86,  w:156, h:150 },
+    'Sleeve':            { x:214, y:78,  w:42,  h:42  },
+  };
 
-.section-head{
-  display:flex; justify-content:space-between; align-items:flex-end;
-  gap: 24px; margin-bottom: 44px; flex-wrap: wrap;
-}
-.section-head h2{ font-size: clamp(28px,4vw,44px); margin:0; }
+  // pre-fill from the hero's live preview (index.html) or a "Use this design" link (designs.html)
+  const params = new URLSearchParams(location.search);
+  const heroGarmentType = params.get('garment');
+  const heroColorName = params.get('color');
+  if(heroGarmentType){
+    const match = GARMENTS.find(g => (g.category === heroGarmentType) || (heroGarmentType === 'Long Sleeve' && g.category === 'Long Sleeve'));
+    if(match) state.garment = match;
+  }
+  if(heroColorName){
+    const colorMatch = COLORS.find(c => c.name.toLowerCase() === heroColorName.toLowerCase());
+    if(colorMatch) state.color = colorMatch;
+  }
+  const designName = params.get('design');
+  if(designName){
+    state.text = designName.toUpperCase();
+    document.getElementById('designText').value = designName.toUpperCase();
+    const note = document.getElementById('prefillNote');
+    note.style.display = 'block';
+    note.textContent = `Starting from the "${designName}" house design — feel free to adjust the garment, colour or text below.`;
+  }
 
-/* ---------- hero ---------- */
-.hero{
-  padding: 70px 0 90px;
-  position: relative;
-  overflow:hidden;
-}
-.hero .wrap{
-  display:grid; grid-template-columns: 1.1fr 0.9fr; gap: 50px; align-items:center;
-}
-.hero h1{
-  font-size: clamp(42px, 6.4vw, 84px);
-  margin-bottom: 22px;
-}
-.hero h1 .accent{ color: var(--thread); }
-.hero-lede{ font-size: 18px; max-width: 46ch; color: var(--graphite); margin-bottom: 34px;}
-.hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; }
-.hero-stats{
-  display:flex; gap: 34px; margin-top: 50px; flex-wrap:wrap;
-  font-family: var(--font-mono);
-}
-.hero-stats div strong{ display:block; font-size: 26px; font-family: var(--font-display); color: var(--canvas); }
-.hero-stats div span{ font-size: 11px; text-transform:uppercase; letter-spacing:.08em; color: var(--graphite); }
+  function renderGarmentPicker(){
+    const el = document.getElementById('garmentPicker');
+    el.innerHTML = GARMENTS.map(g => `<button type="button" class="chip ${g.id===state.garment.id?'selected':''}" data-id="${g.id}">${g.name}</button>`).join('');
+    el.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
+      state.garment = GARMENTS.find(g => g.id === btn.dataset.id);
+      renderGarmentPicker(); renderPreview();
+    }));
+  }
 
-@media (max-width: 900px){
-  .hero .wrap{ grid-template-columns: 1fr; }
-}
+  function renderColorPicker(){
+    const el = document.getElementById('colorPicker');
+    el.innerHTML = COLORS.map(c => `<button type="button" class="swatch-btn ${c.name===state.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
+    el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
+      state.color = COLORS.find(c => c.name === btn.dataset.name);
+      renderColorPicker(); renderPreview();
+    }));
+  }
 
-/* stamped rotating badge */
-.stamp-badge{
-  position:absolute; top: 26px; right: 40px;
-  width: 108px; height:108px;
-  border: 2px solid var(--thread);
-  border-radius: 50%;
-  display:flex; align-items:center; justify-content:center;
-  transform: rotate(-10deg);
-  animation: spin-slow 26s linear infinite;
-  opacity: .9;
-}
-.stamp-badge svg{ width:88px; height:88px; }
-@keyframes spin-slow{ to{ transform: rotate(350deg); } }
-@media (max-width: 900px){ .stamp-badge{ display:none; } }
+  // moves/resizes the print-area box to match the chosen placement, and shows
+  // either the uploaded artwork (as a real image) or the typed text inside it
+  function updatePrintArea(){
+    const svg = document.querySelector('#previewGarment svg');
+    const group = svg && svg.querySelector('#print-area');
+    if(!svg || !group) return;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const placementKey = document.getElementById('placement').value;
+    const box = PLACEMENT_BOXES[placementKey] || PLACEMENT_BOXES['Front, centered'];
 
-/* ---------- garment illustration ---------- */
-.garment-stage{
-  position:relative;
-  background: var(--ink-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 30px;
-  display:flex; align-items:center; justify-content:center;
-  min-height: 380px;
-}
-.garment-stage .crosshair{ position:absolute; color: var(--graphite); }
-.garment-stage .crosshair.tl{ top:14px; left:14px; }
-.garment-stage .crosshair.tr{ top:14px; right:14px; }
-.garment-stage .crosshair.bl{ bottom:14px; left:14px; }
-.garment-stage .crosshair.br{ bottom:14px; right:14px; }
-.garment-stage svg{ width: 100%; max-width: 320px; height:auto; transition: opacity .12s ease; }
-.garment-stage canvas{ width: 100%; max-width: 420px; height:auto; border-radius: 4px; touch-action:none; cursor:grab; }
-.garment-stage canvas:active{ cursor:grabbing; }
+    group.setAttribute('transform', `translate(${box.x},${box.y})`);
+    const rect = group.querySelector('rect');
+    const text = group.querySelector('text');
+    rect.setAttribute('width', box.w);
+    rect.setAttribute('height', box.h);
+    text.setAttribute('x', box.w / 2);
+    text.setAttribute('y', box.h / 2 + 4);
+    text.setAttribute('font-size', box.w < 55 ? 6.5 : (box.w > 130 ? 11 : 9));
 
-/* spec-sheet measurement ticks, decorative — reinforces the "cutting table" concept */
-.dim-h{
-  position:absolute; left:26%; right:26%; bottom:46px; height:0;
-  border-top:1px dashed var(--graphite); opacity:.5; pointer-events:none;
-}
-.dim-h::before, .dim-h::after{ content:""; position:absolute; top:-4px; width:1px; height:9px; background:var(--graphite); }
-.dim-h::before{ left:0; } .dim-h::after{ right:0; }
-.dim-h .dim-label{
-  position:absolute; left:50%; top:-21px; transform:translateX(-50%);
-  font-family: var(--font-mono); font-size:10px; letter-spacing:.04em; color:var(--graphite);
-  background: var(--ink-2); padding:0 6px; white-space:nowrap;
-}
-.dim-v{
-  position:absolute; top:18%; bottom:32%; right:26px; width:0;
-  border-left:1px dashed var(--graphite); opacity:.5; pointer-events:none;
-}
-.dim-v::before, .dim-v::after{ content:""; position:absolute; left:-4px; width:9px; height:1px; background:var(--graphite); }
-.dim-v::before{ top:0; } .dim-v::after{ bottom:0; }
-.dim-v .dim-label{
-  position:absolute; left:9px; top:50%; transform:translateY(-50%) rotate(90deg); transform-origin:left center;
-  font-family: var(--font-mono); font-size:10px; letter-spacing:.04em; color:var(--graphite);
-  background: var(--ink-2); padding:0 6px; white-space:nowrap;
-}
-@media (max-width: 480px){ .dim-h, .dim-v{ display:none; } }
+    const oldImg = group.querySelector('image');
+    if(oldImg) oldImg.remove();
+    const oldClip = svg.querySelector('#print-clip');
+    if(oldClip) oldClip.remove();
 
-/* live spec panel under the hero preview */
-.stage-panel{
-  margin-top:18px; border:1px solid var(--line); background: var(--ink-2);
-  border-radius: var(--radius); padding: 16px 18px;
-}
-.stage-panel-row{ display:flex; justify-content:space-between; align-items:center; padding:7px 0; font-size:13.5px; }
-.stage-panel-row + .stage-panel-row{ border-top:1px dashed var(--line); }
-.stage-panel-k{ font-family: var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color: var(--graphite); }
-.stage-panel-v{ font-weight:600; }
+    const hint = document.getElementById('printAreaHint');
+    const hintText = document.getElementById('printAreaHintText');
 
-.hero-mini-label{
-  font-family: var(--font-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
-  color: var(--graphite); margin: 14px 0 8px;
-}
-.hero-mini-label:first-child{ margin-top:0; }
-.hero-type-row{ display:flex; gap:6px; flex-wrap:wrap; }
-.hero-type-chip{
-  font-family: var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.02em;
-  padding:7px 11px; border:1px solid var(--line); border-radius: var(--radius);
-  cursor:pointer; background:transparent; color: var(--canvas);
-}
-.hero-type-chip.selected{ background: var(--thread); border-color: var(--thread); color: var(--chalk); }
-.hero-swatch-row{ display:flex; gap:8px; flex-wrap:wrap; }
-.swatch-btn.sm{ width:24px; height:24px; }
+    if(state.artworkUrl){
+      let defs = svg.querySelector('defs');
+      if(!defs){ defs = document.createElementNS(svgNS, 'defs'); svg.insertBefore(defs, svg.firstChild); }
+      const clip = document.createElementNS(svgNS, 'clipPath');
+      clip.setAttribute('id', 'print-clip');
+      const clipRect = document.createElementNS(svgNS, 'rect');
+      clipRect.setAttribute('width', box.w);
+      clipRect.setAttribute('height', box.h);
+      clip.appendChild(clipRect);
+      defs.appendChild(clip);
 
-/* ---------- customize page layout ---------- */
-.customize-layout{
-  display:grid; grid-template-columns: 0.95fr 1.05fr; gap:50px; align-items:start;
-}
-.customize-preview-col{ position:sticky; top:100px; }
-@media (max-width: 900px){
-  .customize-layout{ grid-template-columns: 1fr; }
-  .customize-preview-col{ position:static; top:auto; }
-}
-.print-area-hint{
-  display:flex; align-items:center; gap:8px; margin-top:10px;
-  font-family: var(--font-mono); font-size:11px; color: var(--graphite);
-}
-.print-area-hint .dot{ width:7px; height:7px; border-radius:50%; background: var(--thread); flex:none; }
-.print-area-hint.is-empty .dot{ background: var(--graphite); }
-.artwork-filename{ font-family: var(--font-mono); font-size:12px; color: var(--canvas); margin-top:8px; }
+      const img = document.createElementNS(svgNS, 'image');
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', state.artworkUrl);
+      img.setAttribute('href', state.artworkUrl);
+      img.setAttribute('x', 0); img.setAttribute('y', 0);
+      img.setAttribute('width', box.w); img.setAttribute('height', box.h);
+      img.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      img.setAttribute('clip-path', 'url(#print-clip)');
+      group.insertBefore(img, rect);
+      rect.setAttribute('stroke-dasharray', '0');
+      text.style.display = 'none';
+      hint.classList.remove('is-empty');
+      hintText.textContent = `Artwork placed — ${placementKey.toLowerCase()}`;
+    }else{
+      rect.setAttribute('stroke-dasharray', '5 4');
+      text.style.display = '';
+      text.textContent = (state.text || 'YOUR DESIGN').slice(0, box.w < 55 ? 10 : 18);
+      if(state.text){
+        hint.classList.remove('is-empty');
+        hintText.textContent = `Text placed — ${placementKey.toLowerCase()}`;
+      }else{
+        hint.classList.add('is-empty');
+        hintText.textContent = 'No design yet — add text or upload artwork below';
+      }
+    }
+  }
 
-/* ---------- cards ---------- */
-.grid{ display:grid; gap: 24px; }
-.grid-3{ grid-template-columns: repeat(3, 1fr); }
-.grid-4{ grid-template-columns: repeat(4, 1fr); }
-.grid-2{ grid-template-columns: repeat(2, 1fr); }
-@media (max-width: 980px){ .grid-4{ grid-template-columns: repeat(2,1fr);} .grid-3{ grid-template-columns: repeat(2,1fr);} }
-@media (max-width: 640px){ .grid-4, .grid-3, .grid-2{ grid-template-columns: 1fr; } }
+  // --- canvas compositor for a user-uploaded product photo ---
+  const templateCanvas = document.getElementById('templateCanvas');
+  const tctx = templateCanvas.getContext('2d');
+  let dragMode = null; // null | 'move' | 'resize'
+  let dragOffset = { x: 0, y: 0 };
+  const HANDLE_PX = 16;
 
-.card{
-  border: 1px solid var(--line);
-  background: var(--ink-2);
-  border-radius: var(--radius);
-  padding: 26px;
-  transition: border-color .15s ease, transform .15s ease;
-}
-.card:hover{ border-color: var(--thread); transform: translateY(-3px); }
-.card h3{ font-size: 18px; margin-bottom: 10px; }
-.card .card-icon{ width:40px; height:40px; color: var(--thread); margin-bottom: 18px; }
-.section-light .card{ background: var(--chalk); border-color: var(--line-dark); }
+  function sampleBrightness(px, py, pw, ph){
+    try{
+      const data = tctx.getImageData(Math.max(0,px|0), Math.max(0,py|0), Math.max(1,pw|0), Math.max(1,ph|0)).data;
+      let sum = 0, count = 0;
+      for(let i = 0; i < data.length; i += 40){ // sparse sample for speed
+        sum += 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+        count++;
+      }
+      return count ? sum / count / 255 : 0.5;
+    }catch(err){ return 0.5; } // canvas not painted yet / cross-origin — fall back to mid grey
+  }
 
-/* hang-tag style product card */
-.tag-card{
-  position:relative;
-  background: var(--chalk);
-  color: var(--ink);
-  border-radius: 3px 10px 10px 3px;
-  padding: 22px 20px 20px 26px;
-  border: 1px solid var(--line-dark);
-}
-.tag-card::before{
-  content:"";
-  position:absolute; left:10px; top:50%; transform:translateY(-50%);
-  width:8px; height:8px; border-radius:50%;
-  background: var(--ink);
-  box-shadow: 0 0 0 2px var(--chalk), 0 0 0 3px var(--ink);
-}
-.tag-card::after{
-  content:"";
-  position:absolute; left:0; top:12px; bottom:12px;
-  border-left: 2px dashed var(--graphite-2);
-}
-.tag-card .price{ font-family: var(--font-mono); font-weight:700; font-size:20px; }
-.tag-card .swatches{ display:flex; gap:6px; margin: 12px 0; }
-.swatch-dot{ width:18px; height:18px; border-radius:50%; border: 2px solid rgba(0,0,0,.15); }
+  function drawTemplateCanvas(){
+    if(!state.templateImg) return;
+    const img = state.templateImg;
+    const maxDim = 560;
+    const scale = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1) || 1;
+    const w = Math.round(img.naturalWidth * scale) || maxDim;
+    const h = Math.round(img.naturalHeight * scale) || maxDim;
+    if(templateCanvas.width !== w || templateCanvas.height !== h){
+      templateCanvas.width = w; templateCanvas.height = h;
+    }
+    tctx.clearRect(0, 0, w, h);
+    tctx.drawImage(img, 0, 0, w, h);
 
-/* ---------- footer ---------- */
-.site-footer{ background: var(--ink); border-top: 1px solid var(--line); padding: 50px 0 30px; }
-.footer-grid{ display:grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 30px; margin-bottom: 40px; }
-.footer-grid h4{ font-size:13px; font-family: var(--font-mono); letter-spacing:.08em; color: var(--graphite); margin-bottom:14px; }
-.footer-grid ul{ list-style:none; margin:0; padding:0; }
-.footer-grid li{ margin-bottom: 8px; }
-.footer-grid a{ text-decoration:none; color: var(--canvas); font-size: 14px; }
-.footer-grid a:hover{ color: var(--thread); }
-.footer-bottom{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-family: var(--font-mono); font-size:12px; color: var(--graphite); }
-@media (max-width: 760px){ .footer-grid{ grid-template-columns: 1fr 1fr; } }
+    const box = state.box;
+    const px = box.x * w, py = box.y * h, pw = box.w * w, ph = box.h * h;
 
-/* ---------- forms ---------- */
-.form-field{ margin-bottom: 20px; }
-.form-field label{
-  display:block; font-family: var(--font-mono); font-size:12px;
-  text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;
-  color: var(--graphite);
-}
-.section-light .form-field label{ color: var(--graphite-2); }
-.form-field input, .form-field select, .form-field textarea{
-  width:100%; padding: 13px 14px; font-family: var(--font-body); font-size:15px;
-  background: var(--ink-2); border:1px solid var(--line); color: var(--canvas);
-  border-radius: var(--radius);
-}
-.section-light .form-field input, .section-light .form-field select, .section-light .form-field textarea{
-  background: var(--chalk); border-color: var(--line-dark); color: var(--ink);
-}
-.form-field textarea{ resize: vertical; min-height: 110px; }
-.form-row{ display:grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-@media (max-width:640px){ .form-row{ grid-template-columns:1fr; } }
+    if(state.artworkImg){
+      tctx.save();
+      tctx.beginPath(); tctx.rect(px, py, pw, ph); tctx.clip();
+      // multiply blend so the photo's fabric shading/folds still show through the design
+      tctx.globalCompositeOperation = 'multiply';
+      const ai = state.artworkImg;
+      const arScale = Math.max(pw / ai.naturalWidth, ph / ai.naturalHeight);
+      const aw = ai.naturalWidth * arScale, ah = ai.naturalHeight * arScale;
+      tctx.drawImage(ai, px + (pw-aw)/2, py + (ph-ah)/2, aw, ah);
+      tctx.restore();
+    }else{
+      const label = (state.text || 'YOUR DESIGN').slice(0, 24);
+      const brightness = sampleBrightness(px, py, pw, ph);
+      const ink = brightness > 0.55 ? '#14120d' : '#f7f3e8';
+      tctx.save();
+      tctx.strokeStyle = ink; tctx.globalAlpha = 0.8; tctx.lineWidth = 1.5;
+      tctx.setLineDash([6, 5]);
+      tctx.strokeRect(px, py, pw, ph);
+      tctx.globalAlpha = 1;
+      if(state.text){
+        tctx.fillStyle = ink;
+        let fontSize = Math.min(ph * 0.3, pw / (label.length * 0.58));
+        fontSize = Math.max(10, Math.min(fontSize, 34));
+        tctx.font = `700 ${fontSize}px Archivo Black, sans-serif`;
+        tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
+        tctx.fillText(label, px + pw/2, py + ph/2);
+      }else{
+        tctx.fillStyle = ink; tctx.globalAlpha = 0.85;
+        tctx.font = `700 11px Space Mono, monospace`;
+        tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
+        tctx.fillText('YOUR DESIGN', px + pw/2, py + ph/2);
+      }
+      tctx.restore();
+    }
 
-.swatch-picker{ display:flex; gap:10px; flex-wrap:wrap; }
-.swatch-btn{
-  width:38px; height:38px; border-radius:50%; cursor:pointer;
-  border: 2px solid rgba(237,230,214,0.3);
-  position:relative;
-}
-.swatch-btn.selected::after{
-  content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  font-size:14px; color: #fff; mix-blend-mode: difference;
-}
-.chip-group{ display:flex; gap:10px; flex-wrap:wrap; }
-.chip{
-  font-family: var(--font-mono); font-size:13px; text-transform:uppercase;
-  padding:10px 16px; border:1px solid var(--line); border-radius:var(--radius);
-  cursor:pointer; background:transparent; color: var(--canvas);
-}
-.section-light .chip{ border-color: var(--line-dark); color: var(--ink); }
-.chip.selected{ background: var(--thread); border-color: var(--thread); color: var(--chalk); }
+    // resize handle, always visible in edit mode
+    tctx.save();
+    tctx.fillStyle = '#d6432a';
+    tctx.fillRect(px + pw - 10, py + ph - 10, 10, 10);
+    tctx.strokeStyle = '#14120d'; tctx.lineWidth = 1;
+    tctx.strokeRect(px + pw - 10, py + ph - 10, 10, 10);
+    tctx.restore();
+  }
 
-.callout{
-  border-left: 3px solid var(--thread);
-  background: rgba(214,67,42,0.08);
-  padding: 16px 18px;
-  font-size: 14px;
-  border-radius: 0 var(--radius) var(--radius) 0;
-}
+  function canvasPointFromEvent(e){
+    const rect = templateCanvas.getBoundingClientRect();
+    const scaleX = templateCanvas.width / rect.width;
+    const scaleY = templateCanvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
 
-/* ---------- badges / status ---------- */
-.status{ font-family: var(--font-mono); font-size:11px; text-transform:uppercase; padding:4px 9px; border-radius: 20px; letter-spacing:.04em; }
-.status-new{ background: rgba(214,67,42,.18); color:#ff8a70; }
-.status-progress{ background: rgba(212,160,23,.2); color: var(--mustard); }
-.status-done{ background: rgba(62,92,116,.25); color:#8fb4d1; }
-.status-low{ background: rgba(214,67,42,.18); color:#ff8a70; }
-.status-ok{ background: rgba(90,160,90,.18); color:#8fd18f; }
+  templateCanvas.addEventListener('pointerdown', (e) => {
+    if(!state.templateImg) return;
+    const p = canvasPointFromEvent(e);
+    const box = state.box, w = templateCanvas.width, h = templateCanvas.height;
+    const px = box.x*w, py = box.y*h, pw = box.w*w, ph = box.h*h;
+    if(p.x >= px+pw-HANDLE_PX && p.x <= px+pw+HANDLE_PX && p.y >= py+ph-HANDLE_PX && p.y <= py+ph+HANDLE_PX){
+      dragMode = 'resize';
+    }else if(p.x >= px && p.x <= px+pw && p.y >= py && p.y <= py+ph){
+      dragMode = 'move';
+      dragOffset = { x: p.x - px, y: p.y - py };
+    }
+    if(dragMode) templateCanvas.setPointerCapture(e.pointerId);
+  });
 
-/* ---------- table ---------- */
-.table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius: var(--radius); }
-table{ width:100%; border-collapse:collapse; font-size:14px; }
-th, td{ text-align:left; padding: 13px 16px; border-bottom:1px solid var(--line); white-space:nowrap; }
-th{ font-family: var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em; color: var(--graphite); background: var(--ink-2); }
-tr:last-child td{ border-bottom:none; }
-.section-light .table-wrap{ border-color: var(--line-dark); }
-.section-light th{ background: rgba(20,18,13,0.04); color: var(--graphite-2); border-color: var(--line-dark); }
-.section-light td{ border-color: var(--line-dark); }
+  templateCanvas.addEventListener('pointermove', (e) => {
+    if(!dragMode || !state.templateImg) return;
+    const p = canvasPointFromEvent(e);
+    const w = templateCanvas.width, h = templateCanvas.height;
+    const box = state.box;
+    if(dragMode === 'move'){
+      box.x = Math.min(1 - box.w, Math.max(0, (p.x - dragOffset.x) / w));
+      box.y = Math.min(1 - box.h, Math.max(0, (p.y - dragOffset.y) / h));
+    }else if(dragMode === 'resize'){
+      box.w = Math.min(1 - box.x, Math.max(0.08, (p.x / w) - box.x));
+      box.h = Math.min(1 - box.y, Math.max(0.08, (p.y / h) - box.y));
+    }
+    drawTemplateCanvas();
+  });
 
-/* ---------- admin ---------- */
-.admin-shell{ min-height: 60vh; }
-.admin-tabs{ display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom: 30px; flex-wrap:wrap; }
-.admin-tab{
-  font-family: var(--font-mono); font-size:13px; text-transform:uppercase;
-  padding: 12px 18px; background:none; border:none; color: var(--graphite);
-  cursor:pointer; border-bottom: 2px solid transparent; letter-spacing:.04em;
-}
-.admin-tab.active{ color: var(--canvas); border-bottom-color: var(--thread); }
-.admin-panel{ display:none; }
-.admin-panel.active{ display:block; }
-.stat-strip{ display:grid; grid-template-columns: repeat(4,1fr); gap: 18px; margin-bottom: 34px; }
-@media (max-width:760px){ .stat-strip{ grid-template-columns: repeat(2,1fr); } }
-.stat-box{ border:1px solid var(--line); padding: 18px 20px; border-radius: var(--radius); background: var(--ink-2); }
-.stat-box strong{ display:block; font-family: var(--font-display); font-size: 28px; }
-.stat-box span{ font-family: var(--font-mono); font-size:11px; text-transform:uppercase; color: var(--graphite); }
-.login-box{ max-width: 380px; margin: 60px auto; }
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt =>
+    templateCanvas.addEventListener(evt, () => { dragMode = null; })
+  );
 
-.empty-state{
-  text-align:center; padding: 60px 20px; color: var(--graphite);
-  border: 1px dashed var(--line); border-radius: var(--radius);
-  font-family: var(--font-mono); font-size: 13px; text-transform:uppercase; letter-spacing:.04em;
-}
+  async function setTemplateFromFile(file){
+    if(state.templateUrl) URL.revokeObjectURL(state.templateUrl);
+    if(!file){ state.templateUrl = null; state.templateImg = null; return; }
+    state.templateUrl = URL.createObjectURL(file);
+    state.templateImg = await loadImage(state.templateUrl);
+  }
 
-/* small inline icon buttons in tables */
-.icon-btn{ background:none; border:1px solid var(--line); color: var(--canvas); border-radius:var(--radius); padding:6px 10px; cursor:pointer; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; }
-.icon-btn:hover{ border-color: var(--thread); color: var(--thread); }
+  document.getElementById('templateFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0] || null;
+    await setTemplateFromFile(file);
+    const nameEl = document.getElementById('templateFileName');
+    const clearBtn = document.getElementById('clearTemplateBtn');
+    if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Using: ${file.name}`; clearBtn.style.display = 'inline-flex'; }
+    else{ nameEl.style.display = 'none'; nameEl.textContent = ''; clearBtn.style.display = 'none'; }
+    renderPreview();
+  });
 
-/* toast */
-#toast{
-  position: fixed; bottom: 26px; left:50%; transform: translateX(-50%) translateY(20px);
-  background: var(--chalk); color: var(--ink); padding: 14px 22px; border-radius: var(--radius);
-  font-family: var(--font-mono); font-size: 13px; z-index: 200; opacity:0; pointer-events:none;
-  transition: opacity .2s ease, transform .2s ease;
-  border-left: 3px solid var(--thread);
-  box-shadow: 0 10px 30px rgba(0,0,0,.35);
-}
-#toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+  document.getElementById('clearTemplateBtn').addEventListener('click', async () => {
+    await setTemplateFromFile(null);
+    document.getElementById('templateFile').value = '';
+    document.getElementById('templateFileName').style.display = 'none';
+    document.getElementById('clearTemplateBtn').style.display = 'none';
+    renderPreview();
+  });
 
-/* page hero (secondary pages) */
-.page-hero{ padding: 60px 0 40px; border-bottom: 1px solid var(--line); }
-.page-hero .eyebrow{ margin-bottom: 10px; }
-.page-hero h1{ font-size: clamp(32px,5vw,54px); margin-bottom: 12px; }
-.page-hero p{ max-width: 60ch; color: var(--graphite); font-size:16px; }
+  function renderPreview(){
+    const previewGarmentEl = document.getElementById('previewGarment');
+    const dragHint = document.getElementById('templateDragHint');
+
+    if(state.templateImg){
+      previewGarmentEl.style.display = 'none';
+      templateCanvas.style.display = 'block';
+      dragHint.style.display = 'block';
+      drawTemplateCanvas();
+    }else{
+      previewGarmentEl.style.display = '';
+      templateCanvas.style.display = 'none';
+      dragHint.style.display = 'none';
+      const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
+      previewGarmentEl.innerHTML = zgobGarmentSVG(svgType, state.color.hex);
+      updatePrintArea();
+    }
+
+    document.getElementById('previewGarmentName').textContent = state.garment.name;
+    document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
+    document.getElementById('previewPlacement').textContent = state.templateImg ? 'Custom photo — dragged placement' : document.getElementById('placement').value;
+    const qty = Number(document.getElementById('quantity').value) || 1;
+    document.getElementById('previewPrice').textContent = `$${(state.garment.price * qty).toFixed(2)}`;
+
+    if(state.templateImg){
+      const hint = document.getElementById('printAreaHint');
+      const hintText = document.getElementById('printAreaHintText');
+      if(state.artworkUrl || state.text){ hint.classList.remove('is-empty'); hintText.textContent = state.artworkUrl ? 'Artwork placed on your photo' : 'Text placed on your photo'; }
+      else{ hint.classList.add('is-empty'); hintText.textContent = 'No design yet — add text or upload artwork below'; }
+    }
+  }
+
+  document.getElementById('designText').addEventListener('input', e => { state.text = e.target.value; renderPreview(); });
+  document.getElementById('size').addEventListener('change', renderPreview);
+  document.getElementById('quantity').addEventListener('input', renderPreview);
+  document.getElementById('placement').addEventListener('change', renderPreview);
+  document.getElementById('artwork').addEventListener('change', async e => {
+    if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
+    const file = e.target.files[0] || null;
+    state.artworkUrl = file ? URL.createObjectURL(file) : null;
+    state.artworkImg = state.artworkUrl ? await loadImage(state.artworkUrl).catch(() => null) : null;
+    const nameEl = document.getElementById('artworkFileName');
+    if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Selected: ${file.name}`; }
+    else{ nameEl.style.display = 'none'; nameEl.textContent = ''; }
+    renderPreview();
+  });
+
+  renderGarmentPicker();
+  renderColorPicker();
+  renderPreview();
+
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fullName = document.getElementById('fullName').value.trim();
+    const email = document.getElementById('email').value.trim();
+    if(!fullName || !email){ zgobToast('Please add your name and email.'); return; }
+
+    const submitBtn = formEl.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading artwork…';
+
+    // Upload the artwork first so we can send addOrder a plain URL.
+    // In custom-photo mode we upload the *final composited preview* (photo + design
+    // merged) so the print team sees exactly what the customer saw, not just the raw logo.
+    let artworkUrl = null;
+    try{
+      if(state.templateImg){
+        const blob = await new Promise(resolve => templateCanvas.toBlob(resolve, 'image/png'));
+        if(blob) artworkUrl = await ZgobStore.uploadArtwork(blob, 'composited-mockup.png');
+      }else{
+        const artworkFile = document.getElementById('artwork').files[0] || null;
+        if(artworkFile) artworkUrl = await ZgobStore.uploadArtwork(artworkFile, artworkFile.name);
+      }
+    }catch(uploadErr){
+      zgobToast('Could not upload artwork — please try again.');
+      console.error(uploadErr);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit custom order →';
+      return;
+    }
+
+    submitBtn.textContent = 'Sending order…';
+
+    const order = {
+      name: fullName,
+      email,
+      garment: state.garment.name,
+      color: state.color.name,
+      size: document.getElementById('size').value,
+      quantity: Number(document.getElementById('quantity').value) || 1,
+      placement: state.templateImg ? 'Custom photo — dragged placement' : document.getElementById('placement').value,
+      designText: document.getElementById('designText').value.trim(),
+      artworkUrl,
+      notes: document.getElementById('notes').value.trim()
+    };
+
+    try{
+      await ZgobStore.addOrder(order);
+      zgobToast('Order sent! We\'ll follow up by email to confirm your proof.');
+      formEl.reset();
+      state.text = '';
+      if(state.artworkUrl){ URL.revokeObjectURL(state.artworkUrl); state.artworkUrl = null; state.artworkImg = null; }
+      const nameEl = document.getElementById('artworkFileName');
+      nameEl.style.display = 'none'; nameEl.textContent = '';
+      await setTemplateFromFile(null);
+      document.getElementById('templateFileName').style.display = 'none';
+      document.getElementById('clearTemplateBtn').style.display = 'none';
+      state.box = { x: 0.32, y: 0.28, w: 0.36, h: 0.34 };
+      renderPreview();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }catch(err){
+      zgobToast('Something went wrong sending your order — please try again.');
+      console.error(err);
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit custom order →';
+    }
+  });
+})();
+</script>
+</body>
+</html>
