@@ -69,55 +69,67 @@ alter table public.orders    enable row level security;
 alter table public.messages  enable row level security;
 
 -- designs: everyone can browse, only admins manage the catalogue
+drop policy if exists "designs are publicly readable" on public.designs;
 create policy "designs are publicly readable"
   on public.designs for select
   using (true);
 
+drop policy if exists "admins manage designs" on public.designs;
 create policy "admins manage designs"
   on public.designs for all
   using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 
 -- inventory: everyone can see stock/price, only admins edit it
+drop policy if exists "inventory is publicly readable" on public.inventory;
 create policy "inventory is publicly readable"
   on public.inventory for select
   using (true);
 
+drop policy if exists "admins manage inventory" on public.inventory;
 create policy "admins manage inventory"
   on public.inventory for all
   using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 
 -- orders: anyone can submit a custom order, only admins can view/manage the queue
+drop policy if exists "anyone can submit an order" on public.orders;
 create policy "anyone can submit an order"
   on public.orders for insert
   with check (true);
 
+drop policy if exists "admins manage orders" on public.orders;
 create policy "admins manage orders"
   on public.orders for select using (auth.role() = 'authenticated');
 
+drop policy if exists "admins update orders" on public.orders;
 create policy "admins update orders"
   on public.orders for update
   using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 
+drop policy if exists "admins delete orders" on public.orders;
 create policy "admins delete orders"
   on public.orders for delete
   using (auth.role() = 'authenticated');
 
 -- messages: anyone can send one, only admins can read/manage the inbox
+drop policy if exists "anyone can send a message" on public.messages;
 create policy "anyone can send a message"
   on public.messages for insert
   with check (true);
 
+drop policy if exists "admins manage messages" on public.messages;
 create policy "admins manage messages"
   on public.messages for select using (auth.role() = 'authenticated');
 
+drop policy if exists "admins update messages" on public.messages;
 create policy "admins update messages"
   on public.messages for update
   using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 
+drop policy if exists "admins delete messages" on public.messages;
 create policy "admins delete messages"
   on public.messages for delete
   using (auth.role() = 'authenticated');
@@ -130,14 +142,17 @@ insert into storage.buckets (id, name, public)
 values ('artwork', 'artwork', true)
 on conflict (id) do nothing;
 
+drop policy if exists "anyone can upload artwork" on storage.objects;
 create policy "anyone can upload artwork"
   on storage.objects for insert
   with check (bucket_id = 'artwork');
 
+drop policy if exists "artwork is publicly viewable" on storage.objects;
 create policy "artwork is publicly viewable"
   on storage.objects for select
   using (bucket_id = 'artwork');
 
+drop policy if exists "admins delete artwork" on storage.objects;
 create policy "admins delete artwork"
   on storage.objects for delete
   using (bucket_id = 'artwork' and auth.role() = 'authenticated');
