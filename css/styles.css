@@ -283,7 +283,57 @@ section{ padding: 88px 0; }
 .garment-stage .crosshair.tr{ top:14px; right:14px; }
 .garment-stage .crosshair.bl{ bottom:14px; left:14px; }
 .garment-stage .crosshair.br{ bottom:14px; right:14px; }
-.garment-stage svg{ width: 100%; max-width: 320px; height:auto; }
+.garment-stage svg{ width: 100%; max-width: 320px; height:auto; transition: opacity .12s ease; }
+
+/* spec-sheet measurement ticks, decorative — reinforces the "cutting table" concept */
+.dim-h{
+  position:absolute; left:26%; right:26%; bottom:46px; height:0;
+  border-top:1px dashed var(--graphite); opacity:.5; pointer-events:none;
+}
+.dim-h::before, .dim-h::after{ content:""; position:absolute; top:-4px; width:1px; height:9px; background:var(--graphite); }
+.dim-h::before{ left:0; } .dim-h::after{ right:0; }
+.dim-h .dim-label{
+  position:absolute; left:50%; top:-21px; transform:translateX(-50%);
+  font-family: var(--font-mono); font-size:10px; letter-spacing:.04em; color:var(--graphite);
+  background: var(--ink-2); padding:0 6px; white-space:nowrap;
+}
+.dim-v{
+  position:absolute; top:18%; bottom:32%; right:26px; width:0;
+  border-left:1px dashed var(--graphite); opacity:.5; pointer-events:none;
+}
+.dim-v::before, .dim-v::after{ content:""; position:absolute; left:-4px; width:9px; height:1px; background:var(--graphite); }
+.dim-v::before{ top:0; } .dim-v::after{ bottom:0; }
+.dim-v .dim-label{
+  position:absolute; left:9px; top:50%; transform:translateY(-50%) rotate(90deg); transform-origin:left center;
+  font-family: var(--font-mono); font-size:10px; letter-spacing:.04em; color:var(--graphite);
+  background: var(--ink-2); padding:0 6px; white-space:nowrap;
+}
+@media (max-width: 480px){ .dim-h, .dim-v{ display:none; } }
+
+/* live spec panel under the hero preview */
+.stage-panel{
+  margin-top:18px; border:1px solid var(--line); background: var(--ink-2);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.stage-panel-row{ display:flex; justify-content:space-between; align-items:center; padding:7px 0; font-size:13.5px; }
+.stage-panel-row + .stage-panel-row{ border-top:1px dashed var(--line); }
+.stage-panel-k{ font-family: var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color: var(--graphite); }
+.stage-panel-v{ font-weight:600; }
+
+.hero-mini-label{
+  font-family: var(--font-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+  color: var(--graphite); margin: 14px 0 8px;
+}
+.hero-mini-label:first-child{ margin-top:0; }
+.hero-type-row{ display:flex; gap:6px; flex-wrap:wrap; }
+.hero-type-chip{
+  font-family: var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.02em;
+  padding:7px 11px; border:1px solid var(--line); border-radius: var(--radius);
+  cursor:pointer; background:transparent; color: var(--canvas);
+}
+.hero-type-chip.selected{ background: var(--thread); border-color: var(--thread); color: var(--chalk); }
+.hero-swatch-row{ display:flex; gap:8px; flex-wrap:wrap; }
+.swatch-btn.sm{ width:24px; height:24px; }
 
 /* ---------- cards ---------- */
 .grid{ display:grid; gap: 24px; }

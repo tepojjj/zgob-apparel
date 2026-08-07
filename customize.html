@@ -168,8 +168,18 @@
     text: ''
   };
 
-  // pre-fill from a "Use this design" link on designs.html
+  // pre-fill from the hero's live preview (index.html) or a "Use this design" link (designs.html)
   const params = new URLSearchParams(location.search);
+  const heroGarmentType = params.get('garment');
+  const heroColorName = params.get('color');
+  if(heroGarmentType){
+    const match = GARMENTS.find(g => (g.category === heroGarmentType) || (heroGarmentType === 'Long Sleeve' && g.category === 'Long Sleeve'));
+    if(match) state.garment = match;
+  }
+  if(heroColorName){
+    const colorMatch = COLORS.find(c => c.name.toLowerCase() === heroColorName.toLowerCase());
+    if(colorMatch) state.color = colorMatch;
+  }
   const designName = params.get('design');
   if(designName){
     state.text = designName.toUpperCase();

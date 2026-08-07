@@ -54,10 +54,28 @@
           <div><strong>1–500</strong><span>Order sizes we print</span></div>
         </div>
       </div>
-      <div class="garment-stage">
-        <span class="crosshair tl"></span><span class="crosshair tr"></span>
-        <span class="crosshair bl"></span><span class="crosshair br"></span>
-        <div id="heroGarment"></div>
+      <div>
+        <div class="garment-stage">
+          <span class="crosshair tl"></span><span class="crosshair tr"></span>
+          <span class="crosshair bl"></span><span class="crosshair br"></span>
+          <div class="dim-h" aria-hidden="true"><span class="dim-label">20&Prime;</span></div>
+          <div class="dim-v" aria-hidden="true"><span class="dim-label">28&Prime;</span></div>
+          <div id="heroGarment"></div>
+        </div>
+        <div class="stage-panel">
+          <div class="stage-panel-row">
+            <span class="stage-panel-k">Garment</span>
+            <span class="stage-panel-v" id="stagePreviewName">Heavyweight Hoodie</span>
+          </div>
+          <div class="stage-panel-row">
+            <span class="stage-panel-k">Colourway</span>
+            <span class="stage-panel-v" id="stagePreviewColor">Canvas</span>
+          </div>
+          <div class="hero-mini-label">Try a style</div>
+          <div class="hero-type-row" id="heroTypeRow"></div>
+          <div class="hero-mini-label">Try a colour</div>
+          <div class="hero-swatch-row" id="heroSwatchRow"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -188,8 +206,66 @@
 <script src="js/main.js"></script>
 <script>
 (async () => {
-  document.getElementById('heroGarment').innerHTML = zgobGarmentSVG('Hoodie', '#ede6d6');
-  document.getElementById('print-label') && (document.getElementById('print-label').textContent = 'ZGOB');
+  const HERO_TYPES = [
+    { label:'Tee', type:'Tee' },
+    { label:'Hoodie', type:'Hoodie' },
+    { label:'Crewneck', type:'Crewneck' },
+    { label:'Long Sleeve', type:'Long Sleeve' },
+  ];
+  const HERO_COLORS = [
+    { name:'Canvas', hex:'#ede6d6' },
+    { name:'Ink', hex:'#14120d' },
+    { name:'Denim', hex:'#3e5c74' },
+    { name:'Thread Red', hex:'#d6432a' },
+    { name:'Mustard', hex:'#d4a017' },
+    { name:'Chalk', hex:'#f7f3e8' },
+  ];
+  let heroState = { type: 'Hoodie', color: HERO_COLORS[0] };
+
+  function renderHeroPreview(){
+    const stage = document.getElementById('heroGarment');
+    stage.style.opacity = '0';
+    setTimeout(() => {
+      stage.innerHTML = zgobGarmentSVG(heroState.type, heroState.color.hex);
+      const label = document.getElementById('print-label');
+      if(label) label.textContent = 'ZGOB';
+      stage.style.opacity = '1';
+    }, 90);
+    document.getElementById('stagePreviewName').textContent =
+      heroState.type === 'Long Sleeve' ? 'Long Sleeve Tee' : (heroState.type === 'Tee' ? 'Classic Tee' : heroState.type === 'Hoodie' ? 'Heavyweight Hoodie' : 'Crewneck Sweatshirt');
+    document.getElementById('stagePreviewColor').textContent = heroState.color.name;
+  }
+
+  function renderHeroTypeRow(){
+    const el = document.getElementById('heroTypeRow');
+    el.innerHTML = HERO_TYPES.map(t => `<button type="button" class="hero-type-chip ${t.type===heroState.type?'selected':''}" data-type="${t.type}">${t.label}</button>`).join('');
+    el.querySelectorAll('.hero-type-chip').forEach(btn => btn.addEventListener('click', () => {
+      heroState.type = btn.dataset.type;
+      renderHeroTypeRow(); renderHeroPreview();
+    }));
+  }
+  function renderHeroSwatchRow(){
+    const el = document.getElementById('heroSwatchRow');
+    el.innerHTML = HERO_COLORS.map(c => `<button type="button" class="swatch-btn sm ${c.name===heroState.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
+    el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
+      heroState.color = HERO_COLORS.find(c => c.name === btn.dataset.name);
+      renderHeroSwatchRow(); renderHeroPreview();
+    }));
+  }
+
+  renderHeroTypeRow();
+  renderHeroSwatchRow();
+  renderHeroPreview();
+
+  // carry the hero's picks into Customize so the demo isn't a dead end
+  const startBtn = document.querySelector('.hero-ctas a.btn-primary');
+  if(startBtn){
+    startBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams({ garment: heroState.type, color: heroState.color.name });
+      location.href = `customize.html?${params.toString()}`;
+    });
+  }
 
   const featuredEl = document.getElementById('featuredDesigns');
   try{
