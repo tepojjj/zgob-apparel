@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zgob Mockup Quad Picker</title>
+<style>
+  body{ font-family: system-ui, sans-serif; background:#14120d; color:#f7f3e8; margin:0; padding:24px; }
+  h1{ font-size:18px; margin:0 0 4px; }
+  p.sub{ color:#9a9285; font-size:13px; margin:0 0 20px; }
+  .layout{ display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .col{ flex:1; min-width:340px; }
+  .stage{ position:relative; display:inline-block; border:1px solid #3a362c; border-radius:4px; max-width:100%; background:#1c1912; }
+  .stage img, .stage canvas{ display:block; max-width:100%; height:auto; }
+  .stage canvas{ position:absolute; top:0; left:0; cursor:crosshair; }
+  .row{ margin-bottom:14px; }
+  label{ display:block; font-size:12px; color:#c9c2b3; margin-bottom:6px; letter-spacing:.04em; text-transform:uppercase; }
+  input[type=file], input[type=text], input[type=range]{ width:100%; box-sizing:border-box; padding:8px; background:#232019; border:1px solid #3a362c; color:#f7f3e8; border-radius:3px; }
+  button{ padding:9px 16px; background:#d6432a; color:#fff; border:none; border-radius:3px; cursor:pointer; font-size:13px; }
+  button.ghost{ background:transparent; border:1px solid #3a362c; color:#c9c2b3; }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+  .btnrow{ display:flex; gap:8px; margin-top:6px; }
+  pre{ background:#0d0b08; border:1px solid #3a362c; padding:14px; border-radius:4px; font-size:12px; white-space:pre-wrap; word-break:break-all; }
+  .hint{ font-size:12px; color:#9a9285; margin-top:6px; }
+  .steps{ font-size:12px; color:#c9c2b3; line-height:1.7; }
+  .steps b{ color:#f7f3e8; }
+</style>
+</head>
+<body>
+
+<h1>Mockup Quad Picker</h1>
+<p class="sub">Upload a flat-lay garment photo → click 4 print-area corners → preview + copy the config snippet. Nothing here is saved anywhere; it all stays in this tab.</p>
+
+<div class="layout">
+
+  <div class="col">
+    <div class="row">
+      <label>1 · Base garment photo</label>
+      <input type="file" id="baseInput" accept="image/*">
+    </div>
+    <div class="row">
+      <label>2 · Test artwork (optional — for previewing the warp)</label>
+      <input type="file" id="artInput" accept="image/*">
+    </div>
+    <div class="stage" id="stage">
+      <img id="baseImg" style="display:none;">
+      <canvas id="clickCanvas"></canvas>
+    </div>
+    <p class="hint">Click 4 corners in order: <b>top-left → top-right → bottom-right → bottom-left</b> of where the print should sit. Follow the fabric's own tilt if any — don't force a perfect rectangle.</p>
+    <div class="btnrow">
+      <button class="ghost" id="undoBtn" disabled>Undo last point</button>
+      <button class="ghost" id="resetBtn" disabled>Reset points</button>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="row">
+      <label>3 · Live composite preview</label>
+      <div class="stage" id="previewStage">
+        <canvas id="previewCanvas"></canvas>
+      </div>
+    </div>
+    <div class="row">
+      <label>Shade strength: <span id="shadeVal">0.65</span></label>
+      <input type="range" id="shadeSlider" min="0" max="1" step="0.05" value="0.65">
+    </div>
+    <div class="row">
+      <label>4 · Config key names</label>
+      <input type="text" id="garmentType" value="Tee" placeholder="Garment type, e.g. Tee">
+      <div style="height:8px;"></div>
+      <input type="text" id="colorName" value="Canvas" placeholder="Color name, e.g. Canvas">
+    </div>
+    <div class="row">
+      <label>5 · Paste this into js/mockup-config.js</label>
+      <pre id="output">Click 4 points on the photo first…</pre>
+      <button id="copyBtn" disabled>Copy snippet</button>
+    </div>
+    <div class="steps">
+      <b>Where to save the photo:</b> once you're happy with the preview, save your original photo file into <b>photos/garments/</b> in the project (matching the filename you put in the snippet), paste the snippet into <b>js/mockup-config.js</b>, then commit &amp; push as usual.
+    </div>
+  </div>
+
+</div>
+
+<script src="../js/mockup-compositor.js"></script>
+<script>
+(() => {
+  const baseInput = document.getElementById('baseInput');
+  const artInput = document.getElementById('artInput');
+  const baseImgEl = document.getElementById('baseImg');
+  const clickCanvas = document.getElementById('clickCanvas');
+  const cctx = clickCanvas.getContext('2d');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const shadeSlider = document.getElementById('shadeSlider');
+  const shadeVal = document.getElementById('shadeVal');
+  const garmentType = document.getElementById('garmentType');
+  const colorName = document.getElementById('colorName');
+  const output = document.getElementById('output');
+  const copyBtn = document.getElementById('copyBtn');
+  const undoBtn = document.getElementById('undoBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  let baseImg = null;      // loaded <img>, natural size
+  let artImg = null;       // loaded <img> or null (falls back to a placeholder square)
+  let displayScale = 1;    // css px -> natural px
+  let points = [];         // clicked points, in NATURAL image pixel coords
+  let baseFilename = '';
+
+  function loadImageFromFile(file){
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  baseInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    baseFilename = file.name;
+    baseImg = await loadImageFromFile(file);
+    baseImgEl.src = baseImg.src;
+    baseImgEl.style.display = 'block';
+    // size the click canvas to the DISPLAYED (css) size, track scale to natural px
+    requestAnimationFrame(() => {
+      const rect = baseImgEl.getBoundingClientRect();
+      clickCanvas.width = rect.width;
+      clickCanvas.height = rect.height;
+      clickCanvas.style.width = rect.width + 'px';
+      clickCanvas.style.height = rect.height + 'px';
+      displayScale = baseImg.naturalWidth / rect.width;
+      points = [];
+      redrawPoints();
+      updateButtons();
+    });
+  });
+
+  artInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    artImg = await loadImageFromFile(file);
+    renderPreview();
+  });
+
+  function placeholderArtCanvas(){
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#14120d';
+    ctx.fillRect(0,0,512,512);
+    ctx.strokeStyle = '#d6432a'; ctx.lineWidth = 10;
+    ctx.strokeRect(20,20,472,472);
+    ctx.fillStyle = '#f7f3e8';
+    ctx.font = '700 40px Arial, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('TEST', 256, 226);
+    ctx.fillText('DESIGN', 256, 286);
+    return c;
+  }
+
+  clickCanvas.addEventListener('click', (e) => {
+    if(!baseImg) return;
+    if(points.length >= 4) points = []; // start over on 5th click
+    const rect = clickCanvas.getBoundingClientRect();
+    const cssX = e.clientX - rect.left, cssY = e.clientY - rect.top;
+    points.push([Math.round(cssX * displayScale), Math.round(cssY * displayScale)]);
+    redrawPoints();
+    updateButtons();
+    if(points.length === 4) renderPreview();
+  });
+
+  undoBtn.addEventListener('click', () => { points.pop(); redrawPoints(); updateButtons(); });
+  resetBtn.addEventListener('click', () => { points = []; redrawPoints(); updateButtons(); });
+
+  function updateButtons(){
+    undoBtn.disabled = points.length === 0;
+    resetBtn.disabled = points.length === 0;
+    copyBtn.disabled = points.length !== 4;
+    if(points.length !== 4){
+      output.textContent = points.length === 0
+        ? 'Click 4 points on the photo first…'
+        : `${points.length}/4 points placed…`;
+    }
+  }
+
+  function redrawPoints(){
+    cctx.clearRect(0, 0, clickCanvas.width, clickCanvas.height);
+    const labels = ['TL','TR','BR','BL'];
+    cctx.strokeStyle = '#d6432a';
+    cctx.lineWidth = 2;
+    if(points.length > 1){
+      cctx.beginPath();
+      points.forEach((p, i) => {
+        const x = p[0] / displayScale, y = p[1] / displayScale;
+        if(i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
+      });
+      if(points.length === 4) cctx.closePath();
+      cctx.stroke();
+    }
+    points.forEach((p, i) => {
+      const x = p[0] / displayScale, y = p[1] / displayScale;
+      cctx.fillStyle = '#d6432a';
+      cctx.beginPath(); cctx.arc(x, y, 5, 0, Math.PI*2); cctx.fill();
+      cctx.fillStyle = '#f7f3e8';
+      cctx.font = '11px monospace';
+      cctx.fillText(labels[i], x + 8, y - 8);
+    });
+  }
+
+  function renderPreview(){
+    if(!baseImg || points.length !== 4) return;
+    const art = artImg || placeholderArtCanvas();
+    const shadeStrength = parseFloat(shadeSlider.value);
+    ZgobMockupCompositor.renderMockup(previewCanvas, baseImg, art, points, { shadeStrength });
+    updateSnippet(shadeStrength);
+  }
+
+  shadeSlider.addEventListener('input', () => {
+    shadeVal.textContent = shadeSlider.value;
+    renderPreview();
+  });
+
+  function updateSnippet(shadeStrength){
+    const type = garmentType.value.trim() || 'Tee';
+    const color = colorName.value.trim() || 'Canvas';
+    const filename = baseFilename ? `photos/garments/${baseFilename}` : 'photos/garments/YOUR-PHOTO.jpg';
+    output.textContent =
+`'${type}': {
+  '${color}': {
+    src: '${filename}',
+    quad: ${JSON.stringify(points)},
+    shadeStrength: ${shadeStrength}
+  }
+},`;
+  }
+
+  garmentType.addEventListener('input', () => points.length === 4 && updateSnippet(parseFloat(shadeSlider.value)));
+  colorName.addEventListener('input', () => points.length === 4 && updateSnippet(parseFloat(shadeSlider.value)));
+
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(output.textContent);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => copyBtn.textContent = 'Copy snippet', 1200);
+  });
+})();
+</script>
+</body>
+</html>
