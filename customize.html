@@ -62,6 +62,21 @@
             <span class="dot"></span><span id="printAreaHintText">No design yet — add text or upload artwork below</span>
           </div>
         </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px;">
+            <div>
+              <h3 style="font-size:15px; margin:0;">Photo-realistic preview</h3>
+              <p class="graphite-text" style="font-size:12px; margin:4px 0 0;">Renders your design on a real product photo via Printful.</p>
+            </div>
+          </div>
+          <button type="button" id="mockupBtn" class="btn btn-block" disabled>Generate photo-realistic preview →</button>
+          <p id="mockupStatus" class="graphite-text" style="font-size:12px; margin-top:10px; display:none;"></p>
+          <div id="mockupResult" style="display:none; margin-top:16px;">
+            <img id="mockupImage" alt="Photo-realistic mockup" style="width:100%; border-radius:2px; border:1px solid var(--line);">
+            <button type="button" id="mockupClearBtn" class="btn btn-small" style="margin-top:10px;">Back to sketch view</button>
+          </div>
+        </div>
       </div>
 
       <!-- FORM -->
@@ -149,6 +164,7 @@
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
 <script src="js/garments.js"></script>
+<script src="js/mockup.js"></script>
 <script src="js/main.js"></script>
 <script>
 (async () => {
@@ -174,7 +190,9 @@
     garment: GARMENTS[0],
     color: COLORS[0],
     text: '',
-    artworkUrl: null,
+    artworkUrl: null,      // local blob: URL, used only for the instant SVG sketch preview
+    artworkFile: null,     // the actual File, if one was chosen
+    uploadedArtworkUrl: null, // real public URL once uploaded to storage (needed for the Printful mockup)
   };
 
   // approximate print-area box per placement, in the garment SVG's own 300x320 coordinate space
@@ -297,9 +315,20 @@
     const qty = Number(document.getElementById('quantity').value) || 1;
     document.getElementById('previewPrice').textContent = `$${(state.garment.price * qty).toFixed(2)}`;
     updatePrintArea();
+    // any change to garment/color/etc. invalidates a previously generated photo mockup
+    const mockupResultEl = document.getElementById('mockupResult');
+    const garmentStageEl = document.querySelector('.garment-stage');
+    if(mockupResultEl && mockupResultEl.style.display !== 'none'){
+      mockupResultEl.style.display = 'none';
+      garmentStageEl.style.display = '';
+    }
   }
 
-  document.getElementById('designText').addEventListener('input', e => { state.text = e.target.value; renderPreview(); });
+  document.getElementById('designText').addEventListener('input', e => {
+    state.text = e.target.value;
+    renderPreview();
+    updateMockupButtonState();
+  });
   document.getElementById('size').addEventListener('change', renderPreview);
   document.getElementById('quantity').addEventListener('input', renderPreview);
   document.getElementById('placement').addEventListener('change', renderPreview);
@@ -307,10 +336,78 @@
     if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
     const file = e.target.files[0] || null;
     state.artworkUrl = file ? URL.createObjectURL(file) : null;
+    state.artworkFile = file;
+    state.uploadedArtworkUrl = null; // a new/changed file needs re-uploading before a mockup can use it
     const nameEl = document.getElementById('artworkFileName');
     if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Selected: ${file.name}`; }
     else{ nameEl.style.display = 'none'; nameEl.textContent = ''; }
     renderPreview();
+    updateMockupButtonState();
+  });
+
+  /* ---------------- photo-realistic mockup (Printful) ---------------- */
+  const mockupBtn = document.getElementById('mockupBtn');
+  const mockupStatus = document.getElementById('mockupStatus');
+  const mockupResult = document.getElementById('mockupResult');
+  const mockupImage = document.getElementById('mockupImage');
+  const garmentStage = document.querySelector('.garment-stage');
+
+  function updateMockupButtonState(){
+    const hasDesign = !!(state.artworkFile || state.text.trim());
+    mockupBtn.disabled = !hasDesign;
+  }
+  updateMockupButtonState();
+
+  async function ensureArtworkUploaded(){
+    if(state.uploadedArtworkUrl) return state.uploadedArtworkUrl;
+    if(state.artworkFile){
+      state.uploadedArtworkUrl = await ZgobStore.uploadArtwork(state.artworkFile);
+    }else if(state.text.trim()){
+      const blob = await ZgobMockup.textToImageBlob(state.text.trim());
+      state.uploadedArtworkUrl = await ZgobStore.uploadArtwork(blob, 'design-text.png');
+    }
+    return state.uploadedArtworkUrl;
+  }
+
+  function setMockupStatus(msg){
+    mockupStatus.style.display = msg ? 'block' : 'none';
+    mockupStatus.textContent = msg || '';
+  }
+
+  mockupBtn.addEventListener('click', async () => {
+    mockupBtn.disabled = true;
+    const originalLabel = mockupBtn.textContent;
+    mockupBtn.textContent = 'Uploading design…';
+    setMockupStatus('');
+    try{
+      const imageUrl = await ensureArtworkUploaded();
+      mockupBtn.textContent = 'Starting mockup…';
+      const mockupUrl = await ZgobMockup.generate({
+        garment: state.garment.name,
+        color: state.color.name,
+        size: document.getElementById('size').value,
+        placement: document.getElementById('placement').value,
+        imageUrl
+      }, (status) => {
+        mockupBtn.textContent = status === 'pending' ? 'Rendering on the garment…' : `Status: ${status}…`;
+      });
+      mockupImage.src = mockupUrl;
+      mockupResult.style.display = 'block';
+      garmentStage.style.display = 'none';
+    }catch(err){
+      setMockupStatus(err.message || 'Could not generate a photo-realistic preview right now.');
+      console.error(err);
+    }finally{
+      mockupBtn.disabled = false;
+      mockupBtn.textContent = originalLabel;
+      updateMockupButtonState();
+    }
+  });
+
+  document.getElementById('mockupClearBtn').addEventListener('click', () => {
+    mockupResult.style.display = 'none';
+    garmentStage.style.display = '';
+    setMockupStatus('');
   });
 
   renderGarmentPicker();
@@ -327,29 +424,31 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending order…';
 
-    const artworkFile = document.getElementById('artwork').files[0] || null;
-    const order = {
-      name: fullName,
-      email,
-      garment: state.garment.name,
-      color: state.color.name,
-      size: document.getElementById('size').value,
-      quantity: Number(document.getElementById('quantity').value) || 1,
-      placement: document.getElementById('placement').value,
-      designText: document.getElementById('designText').value.trim(),
-      artworkFile,
-      notes: document.getElementById('notes').value.trim()
-    };
-
     try{
+      const artworkUrl = await ensureArtworkUploaded();
+      const order = {
+        name: fullName,
+        email,
+        garment: state.garment.name,
+        color: state.color.name,
+        size: document.getElementById('size').value,
+        quantity: Number(document.getElementById('quantity').value) || 1,
+        placement: document.getElementById('placement').value,
+        designText: document.getElementById('designText').value.trim(),
+        artworkUrl,
+        notes: document.getElementById('notes').value.trim()
+      };
       await ZgobStore.addOrder(order);
       zgobToast('Order sent! We\'ll follow up by email to confirm your proof.');
       formEl.reset();
       state.text = '';
+      state.artworkFile = null;
+      state.uploadedArtworkUrl = null;
       if(state.artworkUrl){ URL.revokeObjectURL(state.artworkUrl); state.artworkUrl = null; }
       const nameEl = document.getElementById('artworkFileName');
       nameEl.style.display = 'none'; nameEl.textContent = '';
       renderPreview();
+      updateMockupButtonState();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }catch(err){
       zgobToast('Something went wrong sending your order — please try again.');

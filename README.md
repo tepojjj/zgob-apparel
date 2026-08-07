@@ -43,7 +43,38 @@ cd zgob-apparel
 vercel --prod
 ```
 
-Either way, no environment variables are required on Vercel — the Supabase URL/key live in `js/config.js` since they're safe to ship to the browser.
+Either way, no environment variables are required on Vercel for the Supabase side — the Supabase URL/key live in `js/config.js` since they're safe to ship to the browser. The Printful mockup feature below does need Vercel-side environment variables.
+
+## 5. Photo-realistic previews (Printful Mockup Generator)
+
+The Customize page's "Generate photo-realistic preview" button renders the
+customer's design onto a real product photo using Printful's Mockup
+Generator API. This runs through two Vercel serverless functions
+(`api/mockup-create.js`, `api/mockup-status.js`) so your Printful API key
+never reaches the browser.
+
+1. **Get a Printful API key.** In [Printful's Developer Portal](https://developers.printful.com), create a private token (Account (all stores), or scoped to one store).
+2. **Set Vercel environment variables** (Project Settings → Environment Variables):
+   - `PRINTFUL_API_KEY` — the token from step 1.
+   - `PRINTFUL_STORE_ID` — optional, only needed if your token has access to multiple stores.
+3. **Map your garments to Printful catalog products.** Open `server/printful.js` and fill in `PRINTFUL_PRODUCTS`:
+   ```js
+   export const PRINTFUL_PRODUCTS = {
+     'Classic Tee': 71, // Bella+Canvas 3001 — a real, verified Printful catalog id
+     'Heavyweight Hoodie': null, // TODO — set to a real catalog product id
+     ...
+   };
+   ```
+   Only `'Classic Tee': 71` is a confirmed real id (Printful's Bella+Canvas 3001 tee) — treat it as a working example, not a guarantee it matches what you want. For every other garment, find the product you want in Printful's catalog (printful.com/custom-products, or `GET https://api.printful.com/products`) and copy its numeric id in. Anything left as `null` will show a clear "no product mapped" error instead of failing silently.
+4. **Redeploy.** That's it — no other code changes needed for the basic front/back placements.
+
+**How it works end to end:** when the customer clicks the button, the browser uploads their design (or, for text-only designs, a canvas-rendered PNG of the text) to the same Supabase `artwork` bucket used for orders, then calls `POST /api/mockup-create` with the garment/colour/size + that image URL. The function looks up the matching Printful variant, starts an async mockup task, and returns a `task_key`. The browser then polls `GET /api/mockup-status` every ~1.5s until Printful reports `completed`, and swaps in the returned photo.
+
+**Things worth knowing:**
+- Mockup generation typically takes 5–30 seconds — the button shows status text while it waits, and times out gracefully after ~30s.
+- Only `"front"`/`"back"` placements are mapped by default (see `PLACEMENT_MAP` in `server/printful.js`). "Left chest" and "Sleeve" currently fall back to `"front"` since valid placement keys are product-specific — confirm the exact keys for your chosen product via `GET /mockup-generator/printfiles/{product_id}` and update the map once you know them.
+- This calls Printful's free Mockup Generator API directly — no Printful order or charge happens from generating a preview.
+- If `PRINTFUL_API_KEY` isn't set, the button will show a clear error rather than hang.
 
 ## What's wired up
 
@@ -51,6 +82,7 @@ Either way, no environment variables are required on Vercel — the Supabase URL
 |---|---|
 | Browse designs / inventory | Public read via RLS, no login needed |
 | Submit a custom order (Customize page) | Public insert; optional artwork upload goes to the `artwork` storage bucket |
+| Photo-realistic mockup preview | `api/mockup-create.js` + `api/mockup-status.js` (Vercel) proxy Printful's Mockup Generator API |
 | Send a message (Contact page) | Public insert |
 | Admin panel (`/admin`) | Real Supabase Auth sign-in; view/update/delete orders, edit stock, manage messages |
 
