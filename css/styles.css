@@ -335,6 +335,23 @@ section{ padding: 88px 0; }
 .hero-swatch-row{ display:flex; gap:8px; flex-wrap:wrap; }
 .swatch-btn.sm{ width:24px; height:24px; }
 
+/* ---------- customize page layout ---------- */
+.customize-layout{
+  display:grid; grid-template-columns: 0.95fr 1.05fr; gap:50px; align-items:start;
+}
+.customize-preview-col{ position:sticky; top:100px; }
+@media (max-width: 900px){
+  .customize-layout{ grid-template-columns: 1fr; }
+  .customize-preview-col{ position:static; top:auto; }
+}
+.print-area-hint{
+  display:flex; align-items:center; gap:8px; margin-top:10px;
+  font-family: var(--font-mono); font-size:11px; color: var(--graphite);
+}
+.print-area-hint .dot{ width:7px; height:7px; border-radius:50%; background: var(--thread); flex:none; }
+.print-area-hint.is-empty .dot{ background: var(--graphite); }
+.artwork-filename{ font-family: var(--font-mono); font-size:12px; color: var(--canvas); margin-top:8px; }
+
 /* ---------- cards ---------- */
 .grid{ display:grid; gap: 24px; }
 .grid-3{ grid-template-columns: repeat(3, 1fr); }

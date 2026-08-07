@@ -32,10 +32,10 @@
   </section>
 
   <section class="section-dark" style="padding-top:50px;">
-    <div class="wrap" style="display:grid; grid-template-columns: 0.85fr 1.15fr; gap:50px; align-items:start;">
+    <div class="wrap customize-layout">
 
       <!-- LIVE PREVIEW -->
-      <div style="position:sticky; top:100px;">
+      <div class="customize-preview-col">
         <div class="garment-stage" style="min-height:420px;">
           <span class="crosshair tl"></span><span class="crosshair tr"></span>
           <span class="crosshair bl"></span><span class="crosshair br"></span>
@@ -50,9 +50,16 @@
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">COLOUR / SIZE</span>
             <strong id="previewColorSize">Canvas / M</strong>
           </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">PLACEMENT</span>
+            <strong id="previewPlacement">Front, centered</strong>
+          </div>
           <div style="display:flex; justify-content:space-between;">
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">EST. PRICE</span>
             <strong id="previewPrice">$24.00</strong>
+          </div>
+          <div class="print-area-hint is-empty" id="printAreaHint">
+            <span class="dot"></span><span id="printAreaHintText">No design yet — add text or upload artwork below</span>
           </div>
         </div>
       </div>
@@ -89,7 +96,8 @@
         <div class="form-field">
           <label for="artwork">Upload artwork (optional — PNG, JPG, SVG)</label>
           <input type="file" id="artwork" accept="image/*">
-          <p class="graphite-text" style="font-size:12px; margin-top:8px;">We'll reach out about your file before printing — this demo doesn't upload it anywhere.</p>
+          <p class="graphite-text" style="font-size:12px; margin-top:8px;">Shows up in the preview on the left, and we'll review it before printing.</p>
+          <p class="artwork-filename" id="artworkFileName" style="display:none;"></p>
         </div>
         <div class="form-field">
           <label for="placement">Placement</label>
@@ -165,7 +173,16 @@
   let state = {
     garment: GARMENTS[0],
     color: COLORS[0],
-    text: ''
+    text: '',
+    artworkUrl: null,
+  };
+
+  // approximate print-area box per placement, in the garment SVG's own 300x320 coordinate space
+  const PLACEMENT_BOXES = {
+    'Front, centered': { x:100, y:110, w:100, h:100 },
+    'Left chest':       { x:150, y:86,  w:44,  h:40  },
+    'Back, full':       { x:72,  y:86,  w:156, h:150 },
+    'Sleeve':            { x:214, y:78,  w:42,  h:42  },
   };
 
   // pre-fill from the hero's live preview (index.html) or a "Use this design" link (designs.html)
@@ -207,20 +224,94 @@
     }));
   }
 
+  // moves/resizes the print-area box to match the chosen placement, and shows
+  // either the uploaded artwork (as a real image) or the typed text inside it
+  function updatePrintArea(){
+    const svg = document.querySelector('#previewGarment svg');
+    const group = svg && svg.querySelector('#print-area');
+    if(!svg || !group) return;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const placementKey = document.getElementById('placement').value;
+    const box = PLACEMENT_BOXES[placementKey] || PLACEMENT_BOXES['Front, centered'];
+
+    group.setAttribute('transform', `translate(${box.x},${box.y})`);
+    const rect = group.querySelector('rect');
+    const text = group.querySelector('text');
+    rect.setAttribute('width', box.w);
+    rect.setAttribute('height', box.h);
+    text.setAttribute('x', box.w / 2);
+    text.setAttribute('y', box.h / 2 + 4);
+    text.setAttribute('font-size', box.w < 55 ? 6.5 : (box.w > 130 ? 11 : 9));
+
+    const oldImg = group.querySelector('image');
+    if(oldImg) oldImg.remove();
+    const oldClip = svg.querySelector('#print-clip');
+    if(oldClip) oldClip.remove();
+
+    const hint = document.getElementById('printAreaHint');
+    const hintText = document.getElementById('printAreaHintText');
+
+    if(state.artworkUrl){
+      let defs = svg.querySelector('defs');
+      if(!defs){ defs = document.createElementNS(svgNS, 'defs'); svg.insertBefore(defs, svg.firstChild); }
+      const clip = document.createElementNS(svgNS, 'clipPath');
+      clip.setAttribute('id', 'print-clip');
+      const clipRect = document.createElementNS(svgNS, 'rect');
+      clipRect.setAttribute('width', box.w);
+      clipRect.setAttribute('height', box.h);
+      clip.appendChild(clipRect);
+      defs.appendChild(clip);
+
+      const img = document.createElementNS(svgNS, 'image');
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', state.artworkUrl);
+      img.setAttribute('href', state.artworkUrl);
+      img.setAttribute('x', 0); img.setAttribute('y', 0);
+      img.setAttribute('width', box.w); img.setAttribute('height', box.h);
+      img.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      img.setAttribute('clip-path', 'url(#print-clip)');
+      group.insertBefore(img, rect);
+      rect.setAttribute('stroke-dasharray', '0');
+      text.style.display = 'none';
+      hint.classList.remove('is-empty');
+      hintText.textContent = `Artwork placed — ${placementKey.toLowerCase()}`;
+    }else{
+      rect.setAttribute('stroke-dasharray', '5 4');
+      text.style.display = '';
+      text.textContent = (state.text || 'YOUR DESIGN').slice(0, box.w < 55 ? 10 : 18);
+      if(state.text){
+        hint.classList.remove('is-empty');
+        hintText.textContent = `Text placed — ${placementKey.toLowerCase()}`;
+      }else{
+        hint.classList.add('is-empty');
+        hintText.textContent = 'No design yet — add text or upload artwork below';
+      }
+    }
+  }
+
   function renderPreview(){
     const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
     document.getElementById('previewGarment').innerHTML = zgobGarmentSVG(svgType, state.color.hex);
-    const label = document.getElementById('print-label');
-    if(label) label.textContent = (state.text || 'YOUR DESIGN').slice(0, 12);
     document.getElementById('previewGarmentName').textContent = state.garment.name;
     document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
+    document.getElementById('previewPlacement').textContent = document.getElementById('placement').value;
     const qty = Number(document.getElementById('quantity').value) || 1;
     document.getElementById('previewPrice').textContent = `$${(state.garment.price * qty).toFixed(2)}`;
+    updatePrintArea();
   }
 
   document.getElementById('designText').addEventListener('input', e => { state.text = e.target.value; renderPreview(); });
   document.getElementById('size').addEventListener('change', renderPreview);
   document.getElementById('quantity').addEventListener('input', renderPreview);
+  document.getElementById('placement').addEventListener('change', renderPreview);
+  document.getElementById('artwork').addEventListener('change', e => {
+    if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
+    const file = e.target.files[0] || null;
+    state.artworkUrl = file ? URL.createObjectURL(file) : null;
+    const nameEl = document.getElementById('artworkFileName');
+    if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Selected: ${file.name}`; }
+    else{ nameEl.style.display = 'none'; nameEl.textContent = ''; }
+    renderPreview();
+  });
 
   renderGarmentPicker();
   renderColorPicker();
@@ -255,6 +346,9 @@
       zgobToast('Order sent! We\'ll follow up by email to confirm your proof.');
       formEl.reset();
       state.text = '';
+      if(state.artworkUrl){ URL.revokeObjectURL(state.artworkUrl); state.artworkUrl = null; }
+      const nameEl = document.getElementById('artworkFileName');
+      nameEl.style.display = 'none'; nameEl.textContent = '';
       renderPreview();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }catch(err){
