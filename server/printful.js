@@ -38,6 +38,22 @@ const PLACEMENT_MAP = {
   'Sleeve': 'front'
 };
 
+/* ---------------------------------------------------------
+   Our theme colours don't match Printful's real dye names
+   (there's no "Canvas" or "Denim" in their catalog), so we
+   match by keyword instead of exact name. First keyword that
+   appears in an available colour name wins; order matters —
+   put the most specific synonym first.
+   --------------------------------------------------------- */
+const COLOR_SYNONYMS = {
+  'Canvas':      ['natural', 'soft cream', 'sand', 'off white', 'cream'],
+  'Ink':         ['black'],
+  'Denim':       ['navy', 'steel blue', 'true royal', 'denim'],
+  'Thread Red':  ['red', 'cranberry'],
+  'Mustard':     ['mustard', 'gold', 'yellow'],
+  'Chalk':       ['white']
+};
+
 function authHeaders(){
   const headers = {
     'Authorization': `Bearer ${process.env.PRINTFUL_API_KEY}`,
@@ -56,13 +72,24 @@ export async function findVariant(productId, color, size){
   if(!res.ok) throw new Error(data?.result || `Printful catalog lookup failed (${res.status})`);
 
   const variants = data.result?.variants || [];
-  const match = variants.find(v =>
-    v.size?.toLowerCase() === String(size).toLowerCase() &&
-    v.color?.toLowerCase().includes(String(color).toLowerCase())
-  );
+  const sizeMatches = variants.filter(v => v.size?.toLowerCase() === String(size).toLowerCase());
+  const pool = sizeMatches.length ? sizeMatches : variants;
+
+  // 1. exact/substring match against our own colour name (works if the product happens to share it)
+  let match = pool.find(v => v.color?.toLowerCase().includes(String(color).toLowerCase()));
+
+  // 2. keyword synonym match against Printful's real colour names
   if(!match){
-    const available = [...new Set(variants.map(v => `${v.color}/${v.size}`))].slice(0, 12).join(', ');
-    throw new Error(`No matching variant for ${color}/${size} on product ${productId}. Available: ${available}`);
+    const synonyms = COLOR_SYNONYMS[color] || [];
+    for(const word of synonyms){
+      match = pool.find(v => v.color?.toLowerCase().includes(word));
+      if(match) break;
+    }
+  }
+
+  if(!match){
+    const colors = [...new Set(pool.map(v => v.color))].slice(0, 15).join(', ');
+    throw new Error(`Couldn't match "${color}" to a real colour on product ${productId} in size ${size}. Available colours: ${colors}. Add a synonym for "${color}" in COLOR_SYNONYMS (server/printful.js) to fix this.`);
   }
   return match.id;
 }

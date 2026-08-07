@@ -71,6 +71,7 @@
             </div>
           </div>
           <button type="button" id="mockupBtn" class="btn btn-block" disabled>Generate photo-realistic preview →</button>
+          <p class="graphite-text" style="font-size:11px; margin-top:8px;">Regenerates automatically about a second after you change your design, garment, colour, size, or placement.</p>
           <p id="mockupStatus" class="graphite-text" style="font-size:12px; margin-top:10px; display:none;"></p>
           <div id="mockupResult" style="display:none; margin-top:16px;">
             <img id="mockupImage" alt="Photo-realistic mockup" style="width:100%; border-radius:2px; border:1px solid var(--line);">
@@ -229,7 +230,7 @@
     el.innerHTML = GARMENTS.map(g => `<button type="button" class="chip ${g.id===state.garment.id?'selected':''}" data-id="${g.id}">${g.name}</button>`).join('');
     el.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
       state.garment = GARMENTS.find(g => g.id === btn.dataset.id);
-      renderGarmentPicker(); renderPreview();
+      renderGarmentPicker(); renderPreview(); scheduleAutoMockup();
     }));
   }
 
@@ -238,7 +239,7 @@
     el.innerHTML = COLORS.map(c => `<button type="button" class="swatch-btn ${c.name===state.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
     el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
       state.color = COLORS.find(c => c.name === btn.dataset.name);
-      renderColorPicker(); renderPreview();
+      renderColorPicker(); renderPreview(); scheduleAutoMockup();
     }));
   }
 
@@ -328,10 +329,11 @@
     state.text = e.target.value;
     renderPreview();
     updateMockupButtonState();
+    scheduleAutoMockup();
   });
-  document.getElementById('size').addEventListener('change', renderPreview);
+  document.getElementById('size').addEventListener('change', () => { renderPreview(); scheduleAutoMockup(); });
   document.getElementById('quantity').addEventListener('input', renderPreview);
-  document.getElementById('placement').addEventListener('change', renderPreview);
+  document.getElementById('placement').addEventListener('change', () => { renderPreview(); scheduleAutoMockup(); });
   document.getElementById('artwork').addEventListener('change', e => {
     if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
     const file = e.target.files[0] || null;
@@ -343,6 +345,7 @@
     else{ nameEl.style.display = 'none'; nameEl.textContent = ''; }
     renderPreview();
     updateMockupButtonState();
+    scheduleAutoMockup();
   });
 
   /* ---------------- photo-realistic mockup (Printful) ---------------- */
@@ -351,6 +354,9 @@
   const mockupResult = document.getElementById('mockupResult');
   const mockupImage = document.getElementById('mockupImage');
   const garmentStage = document.querySelector('.garment-stage');
+
+  let mockupGenerationId = 0;   // guards against a slow, stale request overwriting a newer one
+  let mockupDebounceTimer = null;
 
   function updateMockupButtonState(){
     const hasDesign = !!(state.artworkFile || state.text.trim());
@@ -374,13 +380,19 @@
     mockupStatus.textContent = msg || '';
   }
 
-  mockupBtn.addEventListener('click', async () => {
+  /** Shared by the manual button and the auto-trigger. Ignores its own result if a newer run has started. */
+  async function runMockupGeneration(){
+    if(!(state.artworkFile || state.text.trim())) return;
+    const myId = ++mockupGenerationId;
+
     mockupBtn.disabled = true;
-    const originalLabel = mockupBtn.textContent;
     mockupBtn.textContent = 'Uploading design…';
     setMockupStatus('');
+
     try{
       const imageUrl = await ensureArtworkUploaded();
+      if(myId !== mockupGenerationId) return; // a newer edit superseded this run
+
       mockupBtn.textContent = 'Starting mockup…';
       const mockupUrl = await ZgobMockup.generate({
         garment: state.garment.name,
@@ -389,19 +401,44 @@
         placement: document.getElementById('placement').value,
         imageUrl
       }, (status) => {
+        if(myId !== mockupGenerationId) return;
         mockupBtn.textContent = status === 'pending' ? 'Rendering on the garment…' : `Status: ${status}…`;
       });
+
+      if(myId !== mockupGenerationId) return;
       mockupImage.src = mockupUrl;
       mockupResult.style.display = 'block';
       garmentStage.style.display = 'none';
+      setMockupStatus('');
     }catch(err){
+      if(myId !== mockupGenerationId) return;
+      // fail quietly into the sketch view rather than blocking the page — the sketch already
+      // reflects the current design, so a failed photo attempt shouldn't feel like a dead end
       setMockupStatus(err.message || 'Could not generate a photo-realistic preview right now.');
       console.error(err);
     }finally{
-      mockupBtn.disabled = false;
-      mockupBtn.textContent = originalLabel;
-      updateMockupButtonState();
+      if(myId === mockupGenerationId){
+        mockupBtn.disabled = false;
+        mockupBtn.textContent = 'Regenerate photo-realistic preview →';
+        updateMockupButtonState();
+      }
     }
+  }
+
+  /** Called after any change to garment/colour/size/placement/design. Auto-generates ~1s after things settle. */
+  function scheduleAutoMockup(){
+    clearTimeout(mockupDebounceTimer);
+    mockupGenerationId++; // invalidate any in-flight run so its result won't land after this edit
+    if(!(state.artworkFile || state.text.trim())){
+      setMockupStatus('');
+      return;
+    }
+    mockupDebounceTimer = setTimeout(runMockupGeneration, 1000);
+  }
+
+  mockupBtn.addEventListener('click', () => {
+    clearTimeout(mockupDebounceTimer);
+    runMockupGeneration();
   });
 
   document.getElementById('mockupClearBtn').addEventListener('click', () => {
