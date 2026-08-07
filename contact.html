@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — Zgob Apparel</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="designs.html">Designs</a></li>
+      <li><a href="customize.html">Customize</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="admin.html">Admin</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+  </nav>
+</header>
+
+<main>
+  <section class="page-hero section-dark">
+    <div class="wrap">
+      <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Get in touch</div>
+      <h1>Contact the shop</h1>
+      <p>Questions about an order, bulk pricing, or something that arrived wrong — this goes straight to our team's inbox.</p>
+    </div>
+  </section>
+
+  <section class="section-dark" style="padding-top:50px;">
+    <div class="wrap" style="display:grid; grid-template-columns: 1fr 1.2fr; gap:50px; align-items:start;">
+
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="tag" style="margin-bottom:14px;">Email</div>
+          <h3 style="font-size:18px;">hello@zgobapparel.example</h3>
+          <p class="graphite-text">General questions and order support — usually a reply within one business day.</p>
+        </div>
+        <div class="card" style="margin-bottom:20px;">
+          <div class="tag" style="margin-bottom:14px;">Bulk &amp; team orders</div>
+          <h3 style="font-size:18px;">teams@zgobapparel.example</h3>
+          <p class="graphite-text">Ten or more of the same design — mention size run and deadline in your message.</p>
+        </div>
+        <div class="card">
+          <div class="tag" style="margin-bottom:14px;">Studio hours</div>
+          <h3 style="font-size:18px;">Mon–Fri, 9am–5pm</h3>
+          <p class="graphite-text">Proofs are reviewed and sent out on business days.</p>
+        </div>
+      </div>
+
+      <form id="contactForm" novalidate>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="cName">Full name</label>
+            <input type="text" id="cName" required>
+          </div>
+          <div class="form-field">
+            <label for="cEmail">Email</label>
+            <input type="email" id="cEmail" required>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="cSubject">Subject</label>
+          <select id="cSubject">
+            <option>General question</option>
+            <option>Order status</option>
+            <option>Bulk / team pricing</option>
+            <option>Issue with an order</option>
+            <option>Something else</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="cMessage">Message</label>
+          <textarea id="cMessage" required placeholder="Tell us what's going on — include an order name or date if this is about an existing order."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Send message →</button>
+      </form>
+
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <hr class="cut-line" style="margin-bottom:20px;">
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Zgob Apparel. All rights reserved.</span>
+      <a href="index.html" style="text-decoration:none;">Back to overview</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script>
+  const contactForm = document.getElementById('contactForm');
+  contactForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('cName').value.trim();
+    const email = document.getElementById('cEmail').value.trim();
+    const message = document.getElementById('cMessage').value.trim();
+    if(!name || !email || !message){ zgobToast('Please fill in your name, email, and message.'); return; }
+
+    const submitBtn = contactForm.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+    try{
+      await ZgobStore.addMessage({
+        name, email,
+        subject: document.getElementById('cSubject').value,
+        message
+      });
+      zgobToast('Message sent — we\'ll get back to you soon.');
+      contactForm.reset();
+    }catch(err){
+      zgobToast('Something went wrong — please try again.');
+      console.error(err);
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send message →';
+    }
+  });
+</script>
+</body>
+</html>

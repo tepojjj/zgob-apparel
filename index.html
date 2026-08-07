@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zgob Apparel — Custom Print Shop</title>
+<meta name="description" content="Zgob Apparel: custom-printed shirts, hoodies and more. Design your own or shop ready-made prints.">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo">
+      <span class="stamp-mark">Z</span> ZGOB APPAREL
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="designs.html">Designs</a></li>
+      <li><a href="customize.html">Customize</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="admin.html">Admin</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero section-dark">
+    <div class="stamp-badge">
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="44" fill="none" stroke="#d6432a" stroke-width="1.5"/>
+        <path id="stampCirclePath" d="M50,50 m-34,0 a34,34 0 1,1 68,0 a34,34 0 1,1 -68,0" fill="none"/>
+        <text font-family="Space Mono, monospace" font-size="8.2" letter-spacing="2" fill="#d6432a">
+          <textPath href="#stampCirclePath" startOffset="0%">EST. ZGOB • SMALL BATCH • MADE TO ORDER •</textPath>
+        </text>
+        <text x="50" y="55" text-anchor="middle" font-family="Archivo Black" font-size="16" fill="#d6432a">Z</text>
+      </svg>
+    </div>
+    <div class="wrap">
+      <div>
+        <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Custom print shop</div>
+        <h1>Blank canvas.<br>Your <span class="accent">design.</span></h1>
+        <p class="hero-lede">Zgob Apparel is a small-batch print shop. Pick a garment, drop in your artwork or text, and we cut, print and ship it — or start from one of our house designs and wear it as-is.</p>
+        <div class="hero-ctas">
+          <a href="customize.html" class="btn btn-primary">Start customizing →</a>
+          <a href="designs.html" class="btn">Browse designs</a>
+        </div>
+        <div class="hero-stats">
+          <div><strong>6</strong><span>Garment styles</span></div>
+          <div><strong>48hr</strong><span>Avg. proof turnaround</span></div>
+          <div><strong>1–500</strong><span>Order sizes we print</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="garment-stage">
+          <span class="crosshair tl"></span><span class="crosshair tr"></span>
+          <span class="crosshair bl"></span><span class="crosshair br"></span>
+          <div class="dim-h" aria-hidden="true"><span class="dim-label">20&Prime;</span></div>
+          <div class="dim-v" aria-hidden="true"><span class="dim-label">28&Prime;</span></div>
+          <div id="heroGarment"></div>
+        </div>
+        <div class="stage-panel">
+          <div class="stage-panel-row">
+            <span class="stage-panel-k">Garment</span>
+            <span class="stage-panel-v" id="stagePreviewName">Heavyweight Hoodie</span>
+          </div>
+          <div class="stage-panel-row">
+            <span class="stage-panel-k">Colourway</span>
+            <span class="stage-panel-v" id="stagePreviewColor">Canvas</span>
+          </div>
+          <div class="hero-mini-label">Try a style</div>
+          <div class="hero-type-row" id="heroTypeRow"></div>
+          <div class="hero-mini-label">Try a colour</div>
+          <div class="hero-swatch-row" id="heroSwatchRow"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="section-light">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">The process</div>
+          <h2>From blank to shipped in four cuts</h2>
+        </div>
+        <p class="graphite-text" style="max-width:32ch;">No account needed to get a quote — just tell us what you're making.</p>
+      </div>
+      <div class="grid grid-4">
+        <div class="card">
+          <div class="tag">01 · Pick</div>
+          <h3 style="margin-top:14px;">Choose a garment</h3>
+          <p class="graphite-text">Tee, hoodie, crewneck, long sleeve, tank or crop — pick the base and colour.</p>
+        </div>
+        <div class="card">
+          <div class="tag">02 · Design</div>
+          <h3 style="margin-top:14px;">Upload or type</h3>
+          <p class="graphite-text">Drop in artwork, add text, and choose where it sits on the garment.</p>
+        </div>
+        <div class="card">
+          <div class="tag">03 · Proof</div>
+          <h3 style="margin-top:14px;">We send a proof</h3>
+          <p class="graphite-text">Your order lands in our queue and we confirm placement before printing.</p>
+        </div>
+        <div class="card">
+          <div class="tag">04 · Print</div>
+          <h3 style="margin-top:14px;">Cut, printed, shipped</h3>
+          <p class="graphite-text">Small-batch printed to order — usually out the door within a week.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURED DESIGNS -->
+  <section class="section-dark">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">House designs</div>
+          <h2>Ready to wear, no upload required</h2>
+        </div>
+        <a href="designs.html" class="btn btn-small">View all designs →</a>
+      </div>
+      <div class="grid grid-4" id="featuredDesigns"></div>
+    </div>
+  </section>
+
+  <!-- WHY ZGOB -->
+  <section class="section-mustard">
+    <div class="wrap">
+      <div class="grid grid-3">
+        <div>
+          <h3 style="font-size:20px;">Small batch, not stockpiled</h3>
+          <p style="opacity:.85;">We print to order rather than sitting on inventory, so colours run fresher and misprints don't ship.</p>
+        </div>
+        <div>
+          <h3 style="font-size:20px;">Real proofs, real people</h3>
+          <p style="opacity:.85;">A person checks placement and colour on every custom order before it hits the press.</p>
+        </div>
+        <div>
+          <h3 style="font-size:20px;">Built for small runs</h3>
+          <p style="opacity:.85;">One shirt for yourself or fifty for a team — the shop scales the same way either way.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section-dark" style="padding-top:60px; padding-bottom:70px;">
+    <div class="wrap" style="text-align:center;">
+      <h2 style="font-size:clamp(28px,5vw,46px); max-width:20ch; margin:0 auto 24px;">Ready to put your design on something wearable?</h2>
+      <div class="hero-ctas" style="justify-content:center;">
+        <a href="customize.html" class="btn btn-primary">Start customizing →</a>
+        <a href="contact.html" class="btn">Ask us a question</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a href="index.html" class="logo" style="margin-bottom:12px;"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+        <p class="graphite-text" style="max-width:32ch;">A small print shop for custom and ready-made apparel. Cut, printed and shipped to order.</p>
+      </div>
+      <div>
+        <h4>Shop</h4>
+        <ul>
+          <li><a href="designs.html">Available designs</a></li>
+          <li><a href="customize.html">Customize a garment</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Studio</h4>
+        <ul>
+          <li><a href="contact.html">Contact us</a></li>
+          <li><a href="admin.html">Staff admin</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Info</h4>
+        <ul>
+          <li><a href="contact.html">Shipping &amp; proofs</a></li>
+          <li><a href="contact.html">Bulk / team orders</a></li>
+        </ul>
+      </div>
+    </div>
+    <hr class="cut-line" style="margin-bottom:20px;">
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Zgob Apparel. All rights reserved.</span>
+      <span>Made to order, one cut at a time.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/garments.js"></script>
+<script src="js/main.js"></script>
+<script>
+(async () => {
+  const HERO_TYPES = [
+    { label:'Tee', type:'Tee' },
+    { label:'Hoodie', type:'Hoodie' },
+    { label:'Crewneck', type:'Crewneck' },
+    { label:'Long Sleeve', type:'Long Sleeve' },
+  ];
+  const HERO_COLORS = [
+    { name:'Canvas', hex:'#ede6d6' },
+    { name:'Ink', hex:'#14120d' },
+    { name:'Denim', hex:'#3e5c74' },
+    { name:'Thread Red', hex:'#d6432a' },
+    { name:'Mustard', hex:'#d4a017' },
+    { name:'Chalk', hex:'#f7f3e8' },
+  ];
+  let heroState = { type: 'Hoodie', color: HERO_COLORS[0] };
+
+  function renderHeroPreview(){
+    const stage = document.getElementById('heroGarment');
+    stage.style.opacity = '0';
+    setTimeout(() => {
+      stage.innerHTML = zgobGarmentSVG(heroState.type, heroState.color.hex);
+      const label = document.getElementById('print-label');
+      if(label) label.textContent = 'ZGOB';
+      stage.style.opacity = '1';
+    }, 90);
+    document.getElementById('stagePreviewName').textContent =
+      heroState.type === 'Long Sleeve' ? 'Long Sleeve Tee' : (heroState.type === 'Tee' ? 'Classic Tee' : heroState.type === 'Hoodie' ? 'Heavyweight Hoodie' : 'Crewneck Sweatshirt');
+    document.getElementById('stagePreviewColor').textContent = heroState.color.name;
+  }
+
+  function renderHeroTypeRow(){
+    const el = document.getElementById('heroTypeRow');
+    el.innerHTML = HERO_TYPES.map(t => `<button type="button" class="hero-type-chip ${t.type===heroState.type?'selected':''}" data-type="${t.type}">${t.label}</button>`).join('');
+    el.querySelectorAll('.hero-type-chip').forEach(btn => btn.addEventListener('click', () => {
+      heroState.type = btn.dataset.type;
+      renderHeroTypeRow(); renderHeroPreview();
+    }));
+  }
+  function renderHeroSwatchRow(){
+    const el = document.getElementById('heroSwatchRow');
+    el.innerHTML = HERO_COLORS.map(c => `<button type="button" class="swatch-btn sm ${c.name===heroState.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
+    el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
+      heroState.color = HERO_COLORS.find(c => c.name === btn.dataset.name);
+      renderHeroSwatchRow(); renderHeroPreview();
+    }));
+  }
+
+  renderHeroTypeRow();
+  renderHeroSwatchRow();
+  renderHeroPreview();
+
+  // carry the hero's picks into Customize so the demo isn't a dead end
+  const startBtn = document.querySelector('.hero-ctas a.btn-primary');
+  if(startBtn){
+    startBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const params = new URLSearchParams({ garment: heroState.type, color: heroState.color.name });
+      location.href = `customize.html?${params.toString()}`;
+    });
+  }
+
+  const featuredEl = document.getElementById('featuredDesigns');
+  try{
+    const featured = (await ZgobStore.getDesigns()).slice(0, 4);
+    featuredEl.innerHTML = featured.map(d => `
+      <div class="card">
+        <div style="display:flex; gap:6px; margin-bottom:16px;">
+          ${d.swatch.map(hex => `<span style="width:16px;height:16px;border-radius:50%;background:${hex};display:inline-block;border:1px solid rgba(237,230,214,.3);"></span>`).join('')}
+        </div>
+        <div class="tag" style="margin-bottom:10px;">${d.category}</div>
+        <h3>${d.title}</h3>
+        <p class="graphite-text" style="font-size:14px;">${d.colorway}</p>
+        <p class="tag-card-price" style="font-family:'Space Mono',monospace; font-weight:700;">$${d.price}</p>
+      </div>
+    `).join('');
+  }catch(err){
+    featuredEl.innerHTML = `<div class="empty-state">Couldn't load designs — check js/config.js has your Supabase URL and key.</div>`;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
