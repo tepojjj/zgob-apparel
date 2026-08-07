@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Zgob Apparel</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="designs.html">Designs</a></li>
+      <li><a href="customize.html">Customize</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="admin.html">Admin</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+  </nav>
+</header>
+
+<main class="section-dark admin-shell">
+  <div class="wrap" style="padding: 50px 28px 90px;">
+
+    <!-- LOGIN -->
+    <div id="loginView" class="login-box">
+      <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Staff only</div>
+      <h1 style="font-size:30px; margin-bottom:10px;">Admin sign in</h1>
+      <p class="graphite-text" style="margin-bottom:26px;">This panel manages custom orders, inventory and customer messages.</p>
+      <div id="loginError" class="callout" style="display:none; margin-bottom:20px; border-color:var(--thread);"></div>
+      <form id="loginForm">
+        <div class="form-field">
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="username" required>
+        </div>
+        <div class="form-field">
+          <label for="pw">Password</label>
+          <input type="password" id="pw" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Sign in →</button>
+        <p class="graphite-text" style="font-size:12px; margin-top:14px;">Sign in with the admin user created in your Supabase project (Authentication → Users).</p>
+      </form>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboardView" style="display:none;">
+      <div class="section-head" style="margin-bottom:26px;">
+        <div>
+          <div class="eyebrow">Dashboard</div>
+          <h1 style="font-size:32px; margin:0;">Zgob back office</h1>
+        </div>
+        <button class="btn btn-small" id="logoutBtn">Sign out</button>
+      </div>
+
+      <div class="stat-strip">
+        <div class="stat-box"><strong id="statNewOrders">0</strong><span>New orders</span></div>
+        <div class="stat-box"><strong id="statTotalOrders">0</strong><span>Total orders</span></div>
+        <div class="stat-box"><strong id="statLowStock">0</strong><span>Low stock lines</span></div>
+        <div class="stat-box"><strong id="statUnread">0</strong><span>Unread messages</span></div>
+      </div>
+
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-tab="orders">Custom orders</button>
+        <button class="admin-tab" data-tab="inventory">Inventory</button>
+        <button class="admin-tab" data-tab="messages">Messages</button>
+      </div>
+
+      <!-- ORDERS -->
+      <div class="admin-panel active" id="tab-orders">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Customer</th><th>Garment</th><th>Size / Qty</th><th>Placement</th><th>Status</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="ordersBody"></tbody>
+          </table>
+        </div>
+        <div id="ordersEmpty" class="empty-state" style="display:none; margin-top:16px;">No custom orders yet.</div>
+      </div>
+
+      <!-- INVENTORY -->
+      <div class="admin-panel" id="tab-inventory">
+        <p class="graphite-text" style="margin-bottom:20px;">Stock counts by size. Edit a number and press Enter or click away to save.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Garment</th><th>Price</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th><th>Status</th></tr>
+            </thead>
+            <tbody id="inventoryBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MESSAGES -->
+      <div class="admin-panel" id="tab-messages">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Date</th><th>From</th><th>Subject</th><th>Message</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="messagesBody"></tbody>
+          </table>
+        </div>
+        <div id="messagesEmpty" class="empty-state" style="display:none; margin-top:16px;">No messages yet.</div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <hr class="cut-line" style="margin-bottom:20px;">
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Zgob Apparel. All rights reserved.</span>
+      <a href="index.html" style="text-decoration:none;">Back to overview</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/main.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

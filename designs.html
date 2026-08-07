@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Available Designs — Zgob Apparel</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="designs.html">Designs</a></li>
+      <li><a href="customize.html">Customize</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="admin.html">Admin</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+  </nav>
+</header>
+
+<main>
+  <section class="page-hero section-dark">
+    <div class="wrap">
+      <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> House designs</div>
+      <h1>Available designs</h1>
+      <p>Ready-made prints, already proofed and in rotation. Pick one, choose your garment and colour, and it ships without a design review step.</p>
+    </div>
+  </section>
+
+  <section class="section-dark" style="padding-top:50px;">
+    <div class="wrap">
+      <div class="chip-group" id="categoryFilter" style="margin-bottom:36px;"></div>
+      <div class="grid grid-4" id="designGrid"></div>
+      <div id="emptyState" class="empty-state" style="display:none; margin-top:20px;">No designs in this category yet — check back soon.</div>
+    </div>
+  </section>
+
+  <section class="section-mustard" style="padding:56px 0;">
+    <div class="wrap" style="display:flex; justify-content:space-between; align-items:center; gap:24px; flex-wrap:wrap;">
+      <div>
+        <h3 style="font-size:22px; margin-bottom:6px;">Don't see what you're after?</h3>
+        <p style="opacity:.85; margin:0;">Upload your own artwork or type a message on the customize page.</p>
+      </div>
+      <a href="customize.html" class="btn btn-dark">Start from scratch →</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <hr class="cut-line" style="margin-bottom:20px;">
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Zgob Apparel. All rights reserved.</span>
+      <a href="index.html" style="text-decoration:none;">Back to overview</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/garments.js"></script>
+<script src="js/main.js"></script>
+<script>
+(async () => {
+  const filterEl = document.getElementById('categoryFilter');
+  const gridEl = document.getElementById('designGrid');
+  const emptyEl = document.getElementById('emptyState');
+  let designs = [];
+  let categories = ['All'];
+  let active = 'All';
+
+  try{
+    designs = await ZgobStore.getDesigns();
+    categories = ['All', ...new Set(designs.map(d => d.category))];
+  }catch(err){
+    gridEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = "Couldn't load designs — check js/config.js has your Supabase URL and key.";
+    console.error(err);
+    return;
+  }
+
+  function renderChips(){
+    filterEl.innerHTML = categories.map(c =>
+      `<button class="chip ${c===active?'selected':''}" data-cat="${c}">${c}</button>`
+    ).join('');
+    filterEl.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => { active = btn.dataset.cat; renderChips(); renderGrid(); });
+    });
+  }
+
+  function renderGrid(){
+    const list = active === 'All' ? designs : designs.filter(d => d.category === active);
+    emptyEl.style.display = list.length ? 'none' : 'block';
+    gridEl.innerHTML = list.map(d => `
+      <div class="card" style="display:flex; flex-direction:column;">
+        <div style="background: var(--ink); border:1px solid var(--line); border-radius:2px; padding:14px; margin-bottom:16px;">
+          ${zgobGarmentSVG('Tee', d.swatch[d.swatch.length-1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0,10))}
+        </div>
+        ${d.tags.length ? `<div class="tag" style="align-self:flex-start; margin-bottom:10px; color:var(--thread); border-color:var(--thread);">${d.tags[0]}</div>` : ''}
+        <h3>${d.title}</h3>
+        <p class="graphite-text" style="font-size:14px; flex:1;">${d.colorway}</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+          <span style="font-family:'Space Mono',monospace; font-weight:700;">$${d.price}</span>
+          <a href="customize.html?design=${encodeURIComponent(d.title)}" class="btn btn-small">Use this design</a>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  renderChips();
+  renderGrid();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customize — Zgob Apparel</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="designs.html">Designs</a></li>
+      <li><a href="customize.html">Customize</a></li>
+      <li><a href="contact.html">Contact</a></li>
+      <li><a href="admin.html">Admin</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+  </nav>
+</header>
+
+<main>
+  <section class="page-hero section-dark">
+    <div class="wrap">
+      <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Build your own</div>
+      <h1>Customize a garment</h1>
+      <p>Pick a base, drop in your design, and tell us where it goes. Submitting sends the order straight to our queue — we'll follow up by email to confirm the proof.</p>
+    </div>
+  </section>
+
+  <section class="section-dark" style="padding-top:50px;">
+    <div class="wrap" style="display:grid; grid-template-columns: 0.85fr 1.15fr; gap:50px; align-items:start;">
+
+      <!-- LIVE PREVIEW -->
+      <div style="position:sticky; top:100px;">
+        <div class="garment-stage" style="min-height:420px;">
+          <span class="crosshair tl"></span><span class="crosshair tr"></span>
+          <span class="crosshair bl"></span><span class="crosshair br"></span>
+          <div id="previewGarment"></div>
+        </div>
+        <div class="card" style="margin-top:20px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">GARMENT</span>
+            <strong id="previewGarmentName">Classic Tee</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">COLOUR / SIZE</span>
+            <strong id="previewColorSize">Canvas / M</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">EST. PRICE</span>
+            <strong id="previewPrice">$24.00</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORM -->
+      <form id="customizeForm" novalidate>
+        <div class="callout" id="prefillNote" style="display:none; margin-bottom:26px;"></div>
+
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">01 · Garment</h3>
+        <div class="chip-group" id="garmentPicker" style="margin:14px 0 26px;"></div>
+
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">02 · Colour</h3>
+        <div class="swatch-picker" id="colorPicker" style="margin:14px 0 26px;"></div>
+
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">03 · Size &amp; quantity</h3>
+        <div class="form-row" style="margin-bottom:26px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="size">Size</label>
+            <select id="size" required>
+              <option>S</option><option selected>M</option><option>L</option><option>XL</option><option>XXL</option>
+            </select>
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="quantity">Quantity</label>
+            <input type="number" id="quantity" min="1" max="500" value="1" required>
+          </div>
+        </div>
+
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">04 · Your design</h3>
+        <div class="form-field">
+          <label for="designText">Text on garment (optional)</label>
+          <input type="text" id="designText" placeholder="e.g. ZGOB RUN CLUB" maxlength="24">
+        </div>
+        <div class="form-field">
+          <label for="artwork">Upload artwork (optional — PNG, JPG, SVG)</label>
+          <input type="file" id="artwork" accept="image/*">
+          <p class="graphite-text" style="font-size:12px; margin-top:8px;">We'll reach out about your file before printing — this demo doesn't upload it anywhere.</p>
+        </div>
+        <div class="form-field">
+          <label for="placement">Placement</label>
+          <select id="placement">
+            <option>Front, centered</option>
+            <option>Left chest</option>
+            <option>Back, full</option>
+            <option>Sleeve</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="notes">Notes for the print team (optional)</label>
+          <textarea id="notes" placeholder="Colour matching, sizing across a team order, deadline, etc."></textarea>
+        </div>
+
+        <hr class="cut-line" style="margin: 34px 0;">
+
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">05 · Your details</h3>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="fullName">Full name</label>
+            <input type="text" id="fullName" required>
+          </div>
+          <div class="form-field">
+            <label for="email">Email</label>
+            <input type="email" id="email" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:10px;">Submit custom order →</button>
+        <p class="graphite-text" style="font-size:12px; margin-top:12px; text-align:center;">No payment is collected here — we confirm pricing on the proof before charging.</p>
+      </form>
+
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <hr class="cut-line" style="margin-bottom:20px;">
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Zgob Apparel. All rights reserved.</span>
+      <a href="index.html" style="text-decoration:none;">Back to overview</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/garments.js"></script>
+<script src="js/main.js"></script>
+<script>
+(async () => {
+  const formEl = document.getElementById('customizeForm');
+  let GARMENTS = [];
+  try{
+    GARMENTS = await ZgobStore.getInventory(); // { id, name, category, price, sizes }
+  }catch(err){
+    formEl.innerHTML = '<div class="empty-state">Couldn\'t load garments — check js/config.js has your Supabase URL and key.</div>';
+    console.error(err);
+    return;
+  }
+  const COLORS = [
+    { name:'Canvas', hex:'#ede6d6' },
+    { name:'Ink', hex:'#14120d' },
+    { name:'Denim', hex:'#3e5c74' },
+    { name:'Thread Red', hex:'#d6432a' },
+    { name:'Mustard', hex:'#d4a017' },
+    { name:'Chalk', hex:'#f7f3e8' },
+  ];
+
+  let state = {
+    garment: GARMENTS[0],
+    color: COLORS[0],
+    text: ''
+  };
+
+  // pre-fill from a "Use this design" link on designs.html
+  const params = new URLSearchParams(location.search);
+  const designName = params.get('design');
+  if(designName){
+    state.text = designName.toUpperCase();
+    document.getElementById('designText').value = designName.toUpperCase();
+    const note = document.getElementById('prefillNote');
+    note.style.display = 'block';
+    note.textContent = `Starting from the "${designName}" house design — feel free to adjust the garment, colour or text below.`;
+  }
+
+  function renderGarmentPicker(){
+    const el = document.getElementById('garmentPicker');
+    el.innerHTML = GARMENTS.map(g => `<button type="button" class="chip ${g.id===state.garment.id?'selected':''}" data-id="${g.id}">${g.name}</button>`).join('');
+    el.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
+      state.garment = GARMENTS.find(g => g.id === btn.dataset.id);
+      renderGarmentPicker(); renderPreview();
+    }));
+  }
+
+  function renderColorPicker(){
+    const el = document.getElementById('colorPicker');
+    el.innerHTML = COLORS.map(c => `<button type="button" class="swatch-btn ${c.name===state.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
+    el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
+      state.color = COLORS.find(c => c.name === btn.dataset.name);
+      renderColorPicker(); renderPreview();
+    }));
+  }
+
+  function renderPreview(){
+    const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
+    document.getElementById('previewGarment').innerHTML = zgobGarmentSVG(svgType, state.color.hex);
+    const label = document.getElementById('print-label');
+    if(label) label.textContent = (state.text || 'YOUR DESIGN').slice(0, 12);
+    document.getElementById('previewGarmentName').textContent = state.garment.name;
+    document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
+    const qty = Number(document.getElementById('quantity').value) || 1;
+    document.getElementById('previewPrice').textContent = `$${(state.garment.price * qty).toFixed(2)}`;
+  }
+
+  document.getElementById('designText').addEventListener('input', e => { state.text = e.target.value; renderPreview(); });
+  document.getElementById('size').addEventListener('change', renderPreview);
+  document.getElementById('quantity').addEventListener('input', renderPreview);
+
+  renderGarmentPicker();
+  renderColorPicker();
+  renderPreview();
+
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fullName = document.getElementById('fullName').value.trim();
+    const email = document.getElementById('email').value.trim();
+    if(!fullName || !email){ zgobToast('Please add your name and email.'); return; }
+
+    const submitBtn = formEl.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending order…';
+
+    const artworkFile = document.getElementById('artwork').files[0] || null;
+    const order = {
+      name: fullName,
+      email,
+      garment: state.garment.name,
+      color: state.color.name,
+      size: document.getElementById('size').value,
+      quantity: Number(document.getElementById('quantity').value) || 1,
+      placement: document.getElementById('placement').value,
+      designText: document.getElementById('designText').value.trim(),
+      artworkFile,
+      notes: document.getElementById('notes').value.trim()
+    };
+
+    try{
+      await ZgobStore.addOrder(order);
+      zgobToast('Order sent! We\'ll follow up by email to confirm your proof.');
+      formEl.reset();
+      state.text = '';
+      renderPreview();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }catch(err){
+      zgobToast('Something went wrong sending your order — please try again.');
+      console.error(err);
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit custom order →';
+    }
+  });
+})();
+</script>
+</body>
+</html>
