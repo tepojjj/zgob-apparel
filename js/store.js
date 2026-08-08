@@ -123,6 +123,28 @@ const ZgobStore = (() => {
       orThrow(await client.from('messages').delete().eq('id', id));
     },
 
+    /* ---------------- garment reference photos ---------------- */
+    async getGarmentPhotos(){
+      return orThrow(await client.from('garment_photos').select('*').order('garment'));
+    },
+    /** Upload a real blank-garment reference photo, return its public URL. Same bucket as design/artwork uploads. */
+    async uploadGarmentPhoto(fileOrBlob){
+      const name = (fileOrBlob.name || 'garment.jpg').replace(/\s+/g, '_');
+      const path = `garment-photos/${Date.now()}_${name}`;
+      const upload = await client.storage.from('artwork').upload(path, fileOrBlob);
+      if(upload.error) throw upload.error;
+      return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
+    },
+    /** Save (or replace) the reference photo for a garment+colour pair. */
+    async saveGarmentPhoto({ garment, color, imageUrl }){
+      return orThrow(await client.from('garment_photos')
+        .upsert({ garment, color, image_url: imageUrl }, { onConflict: 'garment,color' })
+        .select().single());
+    },
+    async deleteGarmentPhoto(id){
+      orThrow(await client.from('garment_photos').delete().eq('id', id));
+    },
+
     /* ---------------- admin auth (real Supabase Auth) ---------------- */
     async login(email, password){
       const { error } = await client.auth.signInWithPassword({ email, password });

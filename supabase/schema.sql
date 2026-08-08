@@ -61,6 +61,15 @@ create table if not exists public.messages (
   created_at  timestamptz not null default now()
 );
 
+create table if not exists public.garment_photos (
+  id          uuid primary key default gen_random_uuid(),
+  garment     text not null,  -- matches an inventory item's display name, e.g. "Heavyweight Hoodie"
+  color       text not null,  -- matches a colourway name, e.g. "Canvas"
+  image_url   text not null,  -- real reference photo of the blank garment
+  created_at  timestamptz not null default now(),
+  unique (garment, color)
+);
+
 -- ---------------------------------------------------------
 -- ROW LEVEL SECURITY
 -- Public site visitors use the anon key. The admin panel signs
@@ -73,6 +82,7 @@ alter table public.designs   enable row level security;
 alter table public.inventory enable row level security;
 alter table public.orders    enable row level security;
 alter table public.messages  enable row level security;
+alter table public.garment_photos enable row level security;
 
 -- designs: everyone can browse, only admins manage the catalogue
 drop policy if exists "designs are publicly readable" on public.designs;
@@ -139,6 +149,18 @@ drop policy if exists "admins delete messages" on public.messages;
 create policy "admins delete messages"
   on public.messages for delete
   using (auth.role() = 'authenticated');
+
+-- garment_photos: everyone can see the real reference photos, only admins manage them
+drop policy if exists "garment photos are publicly readable" on public.garment_photos;
+create policy "garment photos are publicly readable"
+  on public.garment_photos for select
+  using (true);
+
+drop policy if exists "admins manage garment photos" on public.garment_photos;
+create policy "admins manage garment photos"
+  on public.garment_photos for all
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 -- ---------------------------------------------------------
 -- STORAGE — bucket for uploaded artwork files

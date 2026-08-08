@@ -223,6 +223,8 @@
   ];
   let heroState = { type: 'Hoodie', color: HERO_COLORS[0] };
 
+  if(typeof zgobLoadGarmentPhotos === 'function') await zgobLoadGarmentPhotos();
+
   function renderHeroPreview(){
     const stage = document.getElementById('heroGarment');
     const garmentName = heroState.type === 'Long Sleeve' ? 'Long Sleeve Tee' : (heroState.type === 'Tee' ? 'Classic Tee' : heroState.type === 'Hoodie' ? 'Heavyweight Hoodie' : 'Crewneck Sweatshirt');

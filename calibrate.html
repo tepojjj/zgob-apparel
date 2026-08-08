@@ -3,15 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calibrate garment photo — Zgob Apparel</title>
+<title>Garment reference photos — Zgob Apparel</title>
 <link rel="stylesheet" href="css/styles.css">
 <style>
-  .calib-wrap{ display:grid; grid-template-columns: 1.3fr 1fr; gap: 30px; align-items:start; }
-  @media (max-width: 900px){ .calib-wrap{ grid-template-columns: 1fr; } }
-  #calibCanvas{ max-width:100%; border:1px solid var(--line); border-radius:2px; cursor:crosshair; display:block; }
-  #previewCanvasHolder canvas{ max-width:100%; border:1px solid var(--line); border-radius:2px; display:block; }
-  .step-count{ font-family:'Space Mono',monospace; font-size:12px; color:var(--thread); margin-bottom:10px; }
-  textarea#outputCode{ width:100%; min-height:160px; font-family:'Space Mono',monospace; font-size:12px; background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px; padding:12px; }
+  .ref-wrap{ display:grid; grid-template-columns: 1fr 1.2fr; gap: 30px; align-items:start; }
+  @media (max-width: 900px){ .ref-wrap{ grid-template-columns: 1fr; } }
+  #refPreviewWrap img{ width:100%; border:1px solid var(--line); border-radius:2px; display:block; margin-top:10px; }
+  .ref-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:16px; }
+  .ref-card{ border:1px solid var(--line); border-radius:2px; overflow:hidden; background:var(--ink-2); }
+  .ref-card img{ width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+  .ref-card-body{ padding:10px 12px; }
+  .ref-card-body strong{ display:block; font-size:14px; }
+  .ref-card-body span{ font-family:'Space Mono',monospace; font-size:11px; color:var(--graphite); text-transform:uppercase; }
 </style>
 </head>
 <body>
@@ -29,230 +32,154 @@
   <section class="page-hero section-dark">
     <div class="wrap">
       <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Internal tool</div>
-      <h1>Calibrate a garment photo</h1>
-      <p>Upload a real blank-garment photo, click its print area's four corners in order (top-left → top-right → bottom-right → bottom-left), and copy the generated config into <code style="color:var(--canvas);">js/garment-photos.js</code>.</p>
+      <h1>Garment reference photos</h1>
+      <p>Upload a real photo of a blank garment for a garment + colourway. It replaces the sketch anywhere that garment/colour combo shows up (right now: the homepage hero).</p>
     </div>
   </section>
 
   <section class="section-dark" style="padding-top:40px;">
-    <div class="wrap calib-wrap">
+    <div class="wrap ref-wrap">
 
-      <div>
-        <div class="card">
-          <div class="form-field" style="margin-bottom:14px;">
-            <label for="photoFile">1. Upload the garment photo</label>
-            <input type="file" id="photoFile" accept="image/*">
+      <div class="card">
+        <h3 style="font-size:15px; margin-bottom:14px;">Add a reference photo</h3>
+        <div class="form-row">
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="garmentName">Garment</label>
+            <select id="garmentName">
+              <option>Classic Tee</option>
+              <option>Heavyweight Hoodie</option>
+              <option>Long Sleeve Tee</option>
+              <option>Crewneck Sweatshirt</option>
+              <option>Cropped Tee</option>
+              <option>Tank Top</option>
+            </select>
           </div>
-          <div class="step-count" id="stepCount">Click 4 points: top-left → top-right → bottom-right → bottom-left</div>
-          <canvas id="calibCanvas"></canvas>
-          <div style="margin-top:14px; display:flex; gap:10px;">
-            <button class="btn btn-small" id="resetPointsBtn" type="button">Reset points</button>
-            <button class="btn btn-small" id="undoPointBtn" type="button">Undo last point</button>
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="colorName">Colour</label>
+            <select id="colorName">
+              <option>Canvas</option>
+              <option>Ink</option>
+              <option>Denim</option>
+              <option>Thread Red</option>
+              <option>Mustard</option>
+              <option>Chalk</option>
+            </select>
           </div>
         </div>
+        <div class="form-field" style="margin-top:16px;">
+          <label for="photoFile">Photo</label>
+          <input type="file" id="photoFile" accept="image/*">
+        </div>
+        <div id="refPreviewWrap" style="display:none;">
+          <img id="refPreviewImg" alt="Preview">
+        </div>
+        <button class="btn btn-primary" id="saveRefBtn" type="button" style="margin-top:16px;" disabled>Save reference photo →</button>
+        <p id="refStatus" class="graphite-text" style="font-size:12px; margin-top:10px; display:none;"></p>
       </div>
 
-      <div>
-        <div class="card" style="margin-bottom:20px;">
-          <h3 style="font-size:15px; margin-bottom:14px;">2. Garment &amp; colour</h3>
-          <div class="form-row">
-            <div class="form-field" style="margin-bottom:0;">
-              <label for="garmentName">Garment</label>
-              <select id="garmentName">
-                <option>Classic Tee</option>
-                <option>Heavyweight Hoodie</option>
-                <option>Long Sleeve Tee</option>
-                <option>Crewneck Sweatshirt</option>
-                <option>Cropped Tee</option>
-                <option>Tank Top</option>
-              </select>
-            </div>
-            <div class="form-field" style="margin-bottom:0;">
-              <label for="colorName">Colour</label>
-              <select id="colorName">
-                <option>Canvas</option>
-                <option>Ink</option>
-                <option>Denim</option>
-                <option>Thread Red</option>
-                <option>Mustard</option>
-                <option>Chalk</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-field" style="margin-top:16px; margin-bottom:0;">
-            <label for="photoUrl">Where this photo will be hosted (final URL)</label>
-            <input type="text" id="photoUrl" placeholder="/photos/classic-tee-canvas.jpg">
-            <p class="graphite-text" style="font-size:12px; margin-top:8px;">
-              Upload the same image file somewhere public (your repo's <code>/photos</code> folder, or the Supabase <code>artwork</code> bucket) and put that URL here — this tool only uses your local file for the live preview.
-            </p>
-          </div>
-        </div>
-
-        <div class="card" style="margin-bottom:20px;">
-          <h3 style="font-size:15px; margin-bottom:14px;">3. Live preview</h3>
-          <p class="graphite-text" style="font-size:12px; margin-bottom:12px;">A placeholder "ZGOB" design, warped onto your 4 points, with fabric shading reapplied — this is exactly what customers will see.</p>
-          <div id="previewCanvasHolder"><div class="empty-state">Upload a photo and click 4 points to see a preview</div></div>
-        </div>
-
-        <div class="card">
-          <h3 style="font-size:15px; margin-bottom:14px;">4. Copy into js/garment-photos.js</h3>
-          <textarea id="outputCode" readonly placeholder="Waiting for 4 points…"></textarea>
-          <button class="btn btn-small" id="copyBtn" type="button" style="margin-top:12px;">Copy to clipboard</button>
-        </div>
+      <div class="card">
+        <h3 style="font-size:15px; margin-bottom:14px;">Saved reference photos</h3>
+        <div id="refGrid" class="ref-grid"></div>
+        <div id="refEmpty" class="empty-state" style="display:none;">No reference photos yet — add one on the left.</div>
       </div>
 
     </div>
   </section>
 </main>
 
-<script src="js/compositor.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
 <script>
-(() => {
-  const canvas = document.getElementById('calibCanvas');
-  const ctx = canvas.getContext('2d');
-  let img = null;
-  let scale = 1;      // displayed-size -> natural-pixel-size factor
-  let points = [];    // in NATURAL photo pixel coordinates
+(async () => {
+  const photoFile = document.getElementById('photoFile');
+  const previewWrap = document.getElementById('refPreviewWrap');
+  const previewImg = document.getElementById('refPreviewImg');
+  const saveBtn = document.getElementById('saveRefBtn');
+  const statusEl = document.getElementById('refStatus');
+  const gridEl = document.getElementById('refGrid');
+  const emptyEl = document.getElementById('refEmpty');
+  const garmentSelect = document.getElementById('garmentName');
+  const colorSelect = document.getElementById('colorName');
 
-  const stepCount = document.getElementById('stepCount');
-  const outputCode = document.getElementById('outputCode');
-  const previewHolder = document.getElementById('previewCanvasHolder');
+  let pickedFile = null;
 
-  document.getElementById('photoFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const url = URL.createObjectURL(file);
-    img = await zgobLoadImage(url);
-    points = [];
-
-    const maxDisplayWidth = 640;
-    scale = img.naturalWidth > maxDisplayWidth ? maxDisplayWidth / img.naturalWidth : 1;
-    canvas.width = img.naturalWidth * scale;
-    canvas.height = img.naturalHeight * scale;
-    redraw();
-    updateOutput();
-  });
-
-  canvas.addEventListener('click', (e) => {
-    if(!img || points.length >= 4) return;
-    const rect = canvas.getBoundingClientRect();
-    const displayX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const displayY = (e.clientY - rect.top) * (canvas.height / rect.height);
-    points.push([displayX / scale, displayY / scale]); // store in natural pixel coords
-    redraw();
-    updateOutput();
-  });
-
-  document.getElementById('resetPointsBtn').addEventListener('click', () => {
-    points = [];
-    redraw();
-    updateOutput();
-  });
-  document.getElementById('undoPointBtn').addEventListener('click', () => {
-    points.pop();
-    redraw();
-    updateOutput();
-  });
-
-  function redraw(){
-    if(!img) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = '#d6432a';
-    ctx.fillStyle = '#d6432a';
-    ctx.lineWidth = 2;
-
-    const displayPoints = points.map(([x, y]) => [x * scale, y * scale]);
-    displayPoints.forEach(([x, y], i) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.font = 'bold 12px monospace';
-      const labels = ['TL', 'TR', 'BR', 'BL'];
-      ctx.fillText(labels[i], x + 8, y - 8);
-    });
-    if(displayPoints.length > 1){
-      ctx.beginPath();
-      ctx.moveTo(displayPoints[0][0], displayPoints[0][1]);
-      displayPoints.slice(1).forEach(([x, y]) => ctx.lineTo(x, y));
-      if(displayPoints.length === 4) ctx.closePath();
-      ctx.stroke();
+  photoFile.addEventListener('change', () => {
+    pickedFile = photoFile.files[0] || null;
+    if(pickedFile){
+      previewImg.src = URL.createObjectURL(pickedFile);
+      previewWrap.style.display = 'block';
+    }else{
+      previewWrap.style.display = 'none';
     }
+    saveBtn.disabled = !pickedFile;
+  });
 
-    const remaining = 4 - points.length;
-    const labelsLeft = ['top-left', 'top-right', 'bottom-right', 'bottom-left'].slice(points.length);
-    stepCount.textContent = remaining > 0
-      ? `Click next: ${labelsLeft[0]} (${remaining} point${remaining > 1 ? 's' : ''} left)`
-      : 'All 4 points set — see the preview and code on the right.';
+  function setStatus(msg){
+    statusEl.style.display = msg ? 'block' : 'none';
+    statusEl.textContent = msg || '';
   }
 
-  async function updateOutput(){
-    const garment = document.getElementById('garmentName').value;
-    const color = document.getElementById('colorName').value;
-    const photoUrl = document.getElementById('photoUrl').value.trim() || '/photos/your-photo.jpg';
-
-    if(points.length < 4){
-      outputCode.value = '';
-      previewHolder.innerHTML = '<div class="empty-state">Upload a photo and click 4 points to see a preview</div>';
+  async function renderGrid(){
+    let rows = [];
+    try{
+      rows = await ZgobStore.getGarmentPhotos();
+    }catch(err){
+      gridEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      emptyEl.textContent = "Couldn't load reference photos — check js/config.js has your Supabase URL and key.";
+      console.error(err);
       return;
     }
-
-    const roundedQuad = points.map(([x, y]) => [Math.round(x), Math.round(y)]);
-    outputCode.value =
-`'${garment}|${color}': {
-  photoUrl: '${photoUrl}',
-  quad: ${JSON.stringify(roundedQuad)}
-},`;
-
-    // live preview using the local photo (object URL) so it works before you've hosted it anywhere
-    try{
-      const placeholderDesignUrl = await makePlaceholderDesign();
-      const resultCanvas = await zgobCompositeMockup({
-        photoUrl: img.src,
-        quad: roundedQuad,
-        designUrl: placeholderDesignUrl
+    emptyEl.style.display = rows.length ? 'none' : 'block';
+    if(rows.length) emptyEl.textContent = 'No reference photos yet — add one on the left.';
+    gridEl.innerHTML = rows.map(row => `
+      <div class="ref-card">
+        <img src="${row.image_url}" alt="${row.garment} in ${row.color}">
+        <div class="ref-card-body">
+          <strong>${row.garment}</strong>
+          <span>${row.color}</span>
+          <button class="icon-btn delete-ref" data-id="${row.id}" style="margin-top:8px;">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    gridEl.querySelectorAll('.delete-ref').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(confirm('Delete this reference photo?')){
+          await ZgobStore.deleteGarmentPhoto(btn.dataset.id);
+          renderGrid();
+        }
       });
-      previewHolder.innerHTML = '';
-      resultCanvas.style.width = '100%';
-      previewHolder.appendChild(resultCanvas);
+    });
+  }
+
+  saveBtn.addEventListener('click', async () => {
+    if(!pickedFile) return;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Uploading…';
+    setStatus('');
+    try{
+      const imageUrl = await ZgobStore.uploadGarmentPhoto(pickedFile);
+      await ZgobStore.saveGarmentPhoto({
+        garment: garmentSelect.value,
+        color: colorSelect.value,
+        imageUrl
+      });
+      setStatus(`Saved — ${garmentSelect.value} in ${colorSelect.value} now uses this photo.`);
+      photoFile.value = '';
+      pickedFile = null;
+      previewWrap.style.display = 'none';
+      renderGrid();
     }catch(err){
-      previewHolder.innerHTML = `<div class="empty-state">Preview failed: ${err.message}</div>`;
+      setStatus('Something went wrong saving that photo.');
+      console.error(err);
+    }finally{
+      saveBtn.disabled = !pickedFile;
+      saveBtn.textContent = 'Save reference photo →';
     }
-  }
-
-  function makePlaceholderDesign(){
-    return new Promise((resolve) => {
-      const c = document.createElement('canvas');
-      c.width = 500; c.height = 500;
-      const pctx = c.getContext('2d');
-      pctx.fillStyle = '#f7f3e8';
-      pctx.fillRect(0, 0, 500, 500);
-      pctx.strokeStyle = '#14120d';
-      pctx.lineWidth = 6;
-      pctx.strokeRect(10, 10, 480, 480);
-      pctx.fillStyle = '#14120d';
-      pctx.textAlign = 'center';
-      pctx.textBaseline = 'middle';
-      pctx.font = 'bold 90px Arial';
-      pctx.fillText('ZGOB', 250, 250);
-      c.toBlob(blob => resolve(URL.createObjectURL(blob)));
-    });
-  }
-
-  document.getElementById('garmentName').addEventListener('change', updateOutput);
-  document.getElementById('colorName').addEventListener('change', updateOutput);
-  document.getElementById('photoUrl').addEventListener('input', updateOutput);
-
-  document.getElementById('copyBtn').addEventListener('click', () => {
-    outputCode.select();
-    navigator.clipboard.writeText(outputCode.value).then(() => {
-      const btn = document.getElementById('copyBtn');
-      const original = btn.textContent;
-      btn.textContent = 'Copied!';
-      setTimeout(() => { btn.textContent = original; }, 1500);
-    });
   });
+
+  renderGrid();
 })();
 </script>
 </body>

@@ -181,6 +181,7 @@
     console.error(err);
     return;
   }
+  if(typeof zgobLoadGarmentPhotos === 'function') await zgobLoadGarmentPhotos();
   const COLORS = [
     { name:'Canvas', hex:'#ede6d6' },
     { name:'Ink', hex:'#14120d' },
@@ -430,7 +431,7 @@
     setMockupStatus('');
 
     try{
-      if(photoConfig){
+      if(photoConfig && photoConfig.quad){
         mockupBtn.textContent = 'Rendering on the photo…';
         const localDesignUrl = await getLocalDesignPreviewUrl();
         if(myId !== mockupGenerationId) return;
