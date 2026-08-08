@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginView = document.getElementById('loginView');
   const dashboardView = document.getElementById('dashboardView');
   const loginError = document.getElementById('loginError');
+  let designsCache = []; // must be declared before the first render can run
 
   async function showDashboard(){
     loginView.style.display = 'none';
@@ -9,7 +10,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     await renderAll();
   }
 
-  if(await ZgobStore.isLoggedIn()) await showDashboard();
+  // tab switching — wired up before the initial render so a render error
+  // can never prevent the tabs themselves from being clickable
+  document.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  try{
+    if(await ZgobStore.isLoggedIn()) await showDashboard();
+  }catch(err){
+    console.error('Failed to load dashboard:', err);
+  }
 
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -33,16 +49,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     dashboardView.style.display = 'none';
     loginView.style.display = 'block';
     document.getElementById('pw').value = '';
-  });
-
-  // tab switching
-  document.querySelectorAll('.admin-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-    });
   });
 
   async function renderAll(){
@@ -146,7 +152,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   let designPhotoUrl = null;       // URL already on the row being edited (kept if no new file is picked)
   let designArtworkFile = null;    // print-ready artwork File picked but not yet uploaded
   let designArtworkUrl = null;     // print-ready artwork URL already on the row being edited
-  let designsCache = [];
 
   const designTitle = document.getElementById('designTitle');
   const designCategory = document.getElementById('designCategory');
