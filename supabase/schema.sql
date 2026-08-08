@@ -17,8 +17,12 @@ create table if not exists public.designs (
   price       numeric not null default 0,
   tags        text[] not null default '{}',
   swatch      text[] not null default '{}',
+  image_url   text,  -- real photo of the finished garment/design (shown in place of the SVG sketch when set)
   created_at  timestamptz not null default now()
 );
+
+-- migration for projects that ran an earlier version of this schema before image_url existed:
+alter table public.designs add column if not exists image_url text;
 
 create table if not exists public.inventory (
   id          text primary key,

@@ -46,12 +46,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   async function renderAll(){
-    const [orders, inventory, messages] = await Promise.all([
-      ZgobStore.getOrders(), ZgobStore.getInventory(), ZgobStore.getMessages()
+    const [orders, inventory, designs, messages] = await Promise.all([
+      ZgobStore.getOrders(), ZgobStore.getInventory(), ZgobStore.getDesigns(), ZgobStore.getMessages()
     ]);
     renderStats(orders, inventory, messages);
     renderOrders(orders);
     renderInventory(inventory);
+    renderDesigns(designs);
     renderMessages(messages);
   }
 
@@ -136,6 +137,143 @@ document.addEventListener('DOMContentLoaded', async () => {
         await ZgobStore.updateStock(input.dataset.id, input.dataset.size, input.value);
         zgobToast('Inventory updated.');
         renderAll();
+      });
+    });
+  }
+
+  /* ---------------- designs ---------------- */
+  let designPhotoFile = null;      // File picked but not yet uploaded
+  let designPhotoUrl = null;       // URL already on the row being edited (kept if no new file is picked)
+  let designsCache = [];
+
+  const designTitle = document.getElementById('designTitle');
+  const designCategory = document.getElementById('designCategory');
+  const designColorway = document.getElementById('designColorway');
+  const designPrice = document.getElementById('designPrice');
+  const designPhotoInput = document.getElementById('designPhoto');
+  const designPhotoName = document.getElementById('designPhotoName');
+  const designPhotoPreviewWrap = document.getElementById('designPhotoPreviewWrap');
+  const designPhotoPreview = document.getElementById('designPhotoPreview');
+  const designEditingId = document.getElementById('designEditingId');
+  const designFormTitle = document.getElementById('designFormTitle');
+  const designSaveBtn = document.getElementById('designSaveBtn');
+  const designCancelEditBtn = document.getElementById('designCancelEditBtn');
+
+  function resetDesignForm(){
+    designEditingId.value = '';
+    designFormTitle.textContent = 'Add a design';
+    designSaveBtn.textContent = 'Save design →';
+    designCancelEditBtn.style.display = 'none';
+    designTitle.value = ''; designCategory.value = ''; designColorway.value = ''; designPrice.value = '';
+    designPhotoInput.value = '';
+    designPhotoFile = null; designPhotoUrl = null;
+    designPhotoName.style.display = 'none'; designPhotoName.textContent = '';
+    designPhotoPreviewWrap.style.display = 'none'; designPhotoPreview.src = '';
+  }
+
+  designPhotoInput.addEventListener('change', () => {
+    const file = designPhotoInput.files[0];
+    if(!file) return;
+    designPhotoFile = file;
+    designPhotoName.style.display = 'block';
+    designPhotoName.textContent = file.name;
+    designPhotoPreviewWrap.style.display = 'block';
+    designPhotoPreview.src = URL.createObjectURL(file);
+  });
+
+  designCancelEditBtn.addEventListener('click', resetDesignForm);
+
+  designSaveBtn.addEventListener('click', async () => {
+    const title = designTitle.value.trim();
+    const category = designCategory.value.trim();
+    const colorway = designColorway.value.trim();
+    const price = Number(designPrice.value);
+    if(!title || !category || !colorway || !(price >= 0)){
+      zgobToast('Fill in title, category, colourway and price.');
+      return;
+    }
+
+    designSaveBtn.disabled = true;
+    designSaveBtn.textContent = designPhotoFile ? 'Uploading photo…' : 'Saving…';
+
+    try{
+      let imageUrl = designPhotoUrl;
+      if(designPhotoFile){
+        imageUrl = await ZgobStore.uploadDesignPhoto(designPhotoFile);
+      }
+
+      const editingId = designEditingId.value;
+      const payload = { title, category, colorway, price, tags: category ? [category] : [], swatch: ['#ede6d6'], imageUrl };
+
+      if(editingId){
+        await ZgobStore.updateDesign(editingId, payload);
+        zgobToast('Design updated.');
+      }else{
+        const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
+        await ZgobStore.addDesign(Object.assign({ id }, payload));
+        zgobToast('Design added.');
+      }
+      resetDesignForm();
+      renderAll();
+    }catch(err){
+      zgobToast('Something went wrong saving the design.');
+      console.error(err);
+    }finally{
+      designSaveBtn.disabled = false;
+      designSaveBtn.textContent = 'Save design →';
+    }
+  });
+
+  function renderDesigns(designs){
+    designsCache = designs;
+    const body = document.getElementById('designsBody');
+    document.getElementById('designsEmpty').style.display = designs.length ? 'none' : 'block';
+
+    body.innerHTML = designs.map(d => `
+      <tr>
+        <td>${d.image_url
+          ? `<img src="${d.image_url}" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:2px; border:1px solid var(--line);">`
+          : `<span class="graphite-text" style="font-size:11px;">Sketch only</span>`}</td>
+        <td><strong>${zgobEscape(d.title)}</strong></td>
+        <td>${zgobEscape(d.category)}</td>
+        <td>$${Number(d.price).toFixed(2)}</td>
+        <td style="display:flex; gap:6px;">
+          <button class="icon-btn edit-design" data-id="${d.id}">Edit</button>
+          <button class="icon-btn delete-design" data-id="${d.id}">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+
+    body.querySelectorAll('.edit-design').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const d = designsCache.find(x => x.id === btn.dataset.id);
+        if(!d) return;
+        designEditingId.value = d.id;
+        designFormTitle.textContent = `Editing "${d.title}"`;
+        designSaveBtn.textContent = 'Save changes →';
+        designCancelEditBtn.style.display = 'inline-block';
+        designTitle.value = d.title;
+        designCategory.value = d.category;
+        designColorway.value = d.colorway;
+        designPrice.value = d.price;
+        designPhotoFile = null;
+        designPhotoUrl = d.image_url || null;
+        designPhotoInput.value = '';
+        if(d.image_url){
+          designPhotoPreviewWrap.style.display = 'block';
+          designPhotoPreview.src = d.image_url;
+        }else{
+          designPhotoPreviewWrap.style.display = 'none';
+        }
+        window.scrollTo({ top: document.querySelector('.card').offsetTop - 20, behavior: 'smooth' });
+      });
+    });
+    body.querySelectorAll('.delete-design').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(confirm('Delete this design? This cannot be undone.')){
+          await ZgobStore.deleteDesign(btn.dataset.id);
+          renderAll();
+        }
       });
     });
   }

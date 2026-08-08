@@ -16,9 +16,46 @@ const ZgobStore = (() => {
   return {
     client, // exposed for edge cases (e.g. auth state listeners)
 
-    /* ---------------- designs (read-only on the public site) ---------------- */
+    /* ---------------- designs (read on the public site, write in admin) ---------------- */
     async getDesigns(){
       return orThrow(await client.from('designs').select('*').order('title'));
+    },
+    /** Upload a real garment photo to the public artwork bucket, return its URL. Same bucket/shape as uploadArtwork. */
+    async uploadDesignPhoto(fileOrBlob){
+      const name = (fileOrBlob.name || 'design.jpg').replace(/\s+/g, '_');
+      const path = `designs/${Date.now()}_${name}`;
+      const upload = await client.storage.from('artwork').upload(path, fileOrBlob);
+      if(upload.error) throw upload.error;
+      return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
+    },
+    async addDesign(design){
+      // design: { id, title, category, colorway, price, tags, swatch, imageUrl }
+      const row = {
+        id: design.id,
+        title: design.title,
+        category: design.category,
+        colorway: design.colorway,
+        price: design.price,
+        tags: design.tags || [],
+        swatch: design.swatch || [],
+        image_url: design.imageUrl || null
+      };
+      return orThrow(await client.from('designs').insert(row).select().single());
+    },
+    async updateDesign(id, design){
+      const row = {
+        title: design.title,
+        category: design.category,
+        colorway: design.colorway,
+        price: design.price,
+        tags: design.tags || [],
+        swatch: design.swatch || [],
+        image_url: design.imageUrl || null
+      };
+      return orThrow(await client.from('designs').update(row).eq('id', id).select().single());
+    },
+    async deleteDesign(id){
+      orThrow(await client.from('designs').delete().eq('id', id));
     },
 
     /* ---------------- inventory ---------------- */

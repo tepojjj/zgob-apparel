@@ -66,6 +66,7 @@
       <div class="admin-tabs">
         <button class="admin-tab active" data-tab="orders">Custom orders</button>
         <button class="admin-tab" data-tab="inventory">Inventory</button>
+        <button class="admin-tab" data-tab="designs">Designs</button>
         <button class="admin-tab" data-tab="messages">Messages</button>
       </div>
 
@@ -95,6 +96,58 @@
             <tbody id="inventoryBody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- DESIGNS -->
+      <div class="admin-panel" id="tab-designs">
+        <p class="graphite-text" style="margin-bottom:20px;">Add a real photo of the finished garment/design here and it replaces the sketch on the public Designs page — this is what customers see as a reference for what a print actually looks like on real fabric.</p>
+
+        <div class="card" style="margin-bottom:28px;">
+          <h3 style="font-size:15px; margin-bottom:16px;" id="designFormTitle">Add a design</h3>
+          <input type="hidden" id="designEditingId">
+          <div class="form-row">
+            <div class="form-field">
+              <label for="designTitle">Title</label>
+              <input type="text" id="designTitle" required>
+            </div>
+            <div class="form-field">
+              <label for="designCategory">Category</label>
+              <input type="text" id="designCategory" placeholder="e.g. Run club" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="designColorway">Colourway (label shown under the title)</label>
+              <input type="text" id="designColorway" placeholder="e.g. Black on Canvas" required>
+            </div>
+            <div class="form-field">
+              <label for="designPrice">Price</label>
+              <input type="number" id="designPrice" min="0" step="0.01" required>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="designPhoto">Real garment photo (optional, but this is what makes it look real — PNG/JPG)</label>
+            <input type="file" id="designPhoto" accept="image/*">
+            <p class="artwork-filename" id="designPhotoName" style="display:none;"></p>
+            <div id="designPhotoPreviewWrap" style="display:none; margin-top:10px;">
+              <img id="designPhotoPreview" style="max-width:180px; border-radius:2px; border:1px solid var(--line);">
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:6px;">
+            <button type="button" class="btn btn-primary" id="designSaveBtn">Save design →</button>
+            <button type="button" class="btn btn-small" id="designCancelEditBtn" style="display:none;">Cancel edit</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Photo</th><th>Title</th><th>Category</th><th>Price</th><th></th></tr>
+            </thead>
+            <tbody id="designsBody"></tbody>
+          </table>
+        </div>
+        <div id="designsEmpty" class="empty-state" style="display:none; margin-top:16px;">No designs yet — add one above.</div>
       </div>
 
       <!-- MESSAGES -->
