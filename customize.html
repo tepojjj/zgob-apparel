@@ -221,13 +221,36 @@
     const colorMatch = COLORS.find(c => c.name.toLowerCase() === heroColorName.toLowerCase());
     if(colorMatch) state.color = colorMatch;
   }
-  const designName = params.get('design');
-  if(designName){
-    state.text = designName.toUpperCase();
-    document.getElementById('designText').value = designName.toUpperCase();
+  const designParam = params.get('design');
+  if(designParam){
     const note = document.getElementById('prefillNote');
-    note.style.display = 'block';
-    note.textContent = `Starting from the "${designName}" house design — feel free to adjust the garment, colour or text below.`;
+    try{
+      const designs = await ZgobStore.getDesigns();
+      // supports both new links (?design=<id>) and older links (?design=<title>)
+      const chosen = designs.find(d => d.id === designParam) || designs.find(d => d.title === designParam);
+      if(chosen && chosen.artwork_url){
+        // hand the shopper the real print file directly — same effect as if they'd uploaded it themselves
+        state.artworkUrl = chosen.artwork_url;
+        state.artworkFile = null;                 // no local File object; it's already a public URL
+        state.uploadedArtworkUrl = chosen.artwork_url; // already hosted, no upload needed before ordering/mockup
+        note.style.display = 'block';
+        note.textContent = `Starting from the "${chosen.title}" house design — the artwork's already loaded below. Adjust the garment, colour or placement, or swap in your own file.`;
+      }else if(chosen){
+        // no print-ready artwork on file for this design yet — fall back to the old text-prefill behaviour
+        state.text = chosen.title.toUpperCase();
+        document.getElementById('designText').value = chosen.title.toUpperCase();
+        note.style.display = 'block';
+        note.textContent = `Starting from the "${chosen.title}" house design — feel free to adjust the garment, colour or text below.`;
+      }else{
+        // unknown id — fall back to treating the raw param as a title, same as before
+        state.text = designParam.toUpperCase();
+        document.getElementById('designText').value = designParam.toUpperCase();
+        note.style.display = 'block';
+        note.textContent = `Starting from the "${designParam}" house design — feel free to adjust the garment, colour or text below.`;
+      }
+    }catch(err){
+      console.error(err);
+    }
   }
 
   function renderGarmentPicker(){
@@ -364,7 +387,7 @@
   let mockupDebounceTimer = null;
 
   function updateMockupButtonState(){
-    const hasDesign = !!(state.artworkFile || state.text.trim());
+    const hasDesign = !!(state.artworkUrl || state.text.trim());
     mockupBtn.disabled = !hasDesign;
   }
   updateMockupButtonState();
@@ -383,7 +406,7 @@
   /** Local-only equivalent of ensureArtworkUploaded — no network upload, just an object: URL the
       compositor can load. Used by the real-photo path so previews stay instant while typing. */
   async function getLocalDesignPreviewUrl(){
-    if(state.artworkFile) return state.artworkUrl; // already an object: URL from the file input handler
+    if(state.artworkUrl) return state.artworkUrl; // object: URL from a file pick, or a design's already-public artwork_url
     if(state.localTextDesignUrl) URL.revokeObjectURL(state.localTextDesignUrl);
     const blob = await ZgobMockup.textToImageBlob(state.text.trim());
     state.localTextDesignUrl = URL.createObjectURL(blob);
@@ -398,7 +421,7 @@
   /** Shared by the manual button and the auto-trigger. Ignores its own result if a newer run has started.
       Priority: a calibrated real photo (instant, fully local) > Printful (needs an uploaded image + network round trip) > nothing. */
   async function runMockupGeneration(){
-    if(!(state.artworkFile || state.text.trim())) return;
+    if(!(state.artworkUrl || state.text.trim())) return;
     const myId = ++mockupGenerationId;
 
     const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.color.name);
@@ -470,7 +493,7 @@
   function scheduleAutoMockup(){
     clearTimeout(mockupDebounceTimer);
     mockupGenerationId++; // invalidate any in-flight run so its result won't land after this edit
-    if(!(state.artworkFile || state.text.trim())){
+    if(!(state.artworkUrl || state.text.trim())){
       setMockupStatus('');
       return;
     }
@@ -491,6 +514,7 @@
   renderGarmentPicker();
   renderColorPicker();
   renderPreview();
+  if(state.artworkUrl) scheduleAutoMockup(); // a design was preloaded with real artwork — go straight to the photo-realistic preview
 
   formEl.addEventListener('submit', async (e) => {
     e.preventDefault();

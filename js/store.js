@@ -29,7 +29,7 @@ const ZgobStore = (() => {
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
     async addDesign(design){
-      // design: { id, title, category, colorway, price, tags, swatch, imageUrl }
+      // design: { id, title, category, colorway, price, tags, swatch, imageUrl, artworkUrl }
       const row = {
         id: design.id,
         title: design.title,
@@ -38,7 +38,8 @@ const ZgobStore = (() => {
         price: design.price,
         tags: design.tags || [],
         swatch: design.swatch || [],
-        image_url: design.imageUrl || null
+        image_url: design.imageUrl || null,
+        artwork_url: design.artworkUrl || null
       };
       return orThrow(await client.from('designs').insert(row).select().single());
     },
@@ -50,7 +51,8 @@ const ZgobStore = (() => {
         price: design.price,
         tags: design.tags || [],
         swatch: design.swatch || [],
-        image_url: design.imageUrl || null
+        image_url: design.imageUrl || null,
+        artwork_url: design.artworkUrl || null
       };
       return orThrow(await client.from('designs').update(row).eq('id', id).select().single());
     },

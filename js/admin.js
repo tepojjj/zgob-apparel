@@ -144,6 +144,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   /* ---------------- designs ---------------- */
   let designPhotoFile = null;      // File picked but not yet uploaded
   let designPhotoUrl = null;       // URL already on the row being edited (kept if no new file is picked)
+  let designArtworkFile = null;    // print-ready artwork File picked but not yet uploaded
+  let designArtworkUrl = null;     // print-ready artwork URL already on the row being edited
   let designsCache = [];
 
   const designTitle = document.getElementById('designTitle');
@@ -154,6 +156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const designPhotoName = document.getElementById('designPhotoName');
   const designPhotoPreviewWrap = document.getElementById('designPhotoPreviewWrap');
   const designPhotoPreview = document.getElementById('designPhotoPreview');
+  const designArtworkInput = document.getElementById('designArtwork');
+  const designArtworkName = document.getElementById('designArtworkName');
   const designEditingId = document.getElementById('designEditingId');
   const designFormTitle = document.getElementById('designFormTitle');
   const designSaveBtn = document.getElementById('designSaveBtn');
@@ -169,6 +173,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     designPhotoFile = null; designPhotoUrl = null;
     designPhotoName.style.display = 'none'; designPhotoName.textContent = '';
     designPhotoPreviewWrap.style.display = 'none'; designPhotoPreview.src = '';
+    designArtworkInput.value = '';
+    designArtworkFile = null; designArtworkUrl = null;
+    designArtworkName.style.display = 'none'; designArtworkName.textContent = '';
   }
 
   designPhotoInput.addEventListener('change', () => {
@@ -179,6 +186,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     designPhotoName.textContent = file.name;
     designPhotoPreviewWrap.style.display = 'block';
     designPhotoPreview.src = URL.createObjectURL(file);
+  });
+
+  designArtworkInput.addEventListener('change', () => {
+    const file = designArtworkInput.files[0];
+    if(!file) return;
+    designArtworkFile = file;
+    designArtworkName.style.display = 'block';
+    designArtworkName.textContent = file.name;
   });
 
   designCancelEditBtn.addEventListener('click', resetDesignForm);
@@ -194,16 +209,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     designSaveBtn.disabled = true;
-    designSaveBtn.textContent = designPhotoFile ? 'Uploading photo…' : 'Saving…';
+    designSaveBtn.textContent = (designPhotoFile || designArtworkFile) ? 'Uploading…' : 'Saving…';
 
     try{
       let imageUrl = designPhotoUrl;
       if(designPhotoFile){
         imageUrl = await ZgobStore.uploadDesignPhoto(designPhotoFile);
       }
+      let artworkUrl = designArtworkUrl;
+      if(designArtworkFile){
+        artworkUrl = await ZgobStore.uploadDesignPhoto(designArtworkFile);
+      }
 
       const editingId = designEditingId.value;
-      const payload = { title, category, colorway, price, tags: category ? [category] : [], swatch: ['#ede6d6'], imageUrl };
+      const payload = { title, category, colorway, price, tags: category ? [category] : [], swatch: ['#ede6d6'], imageUrl, artworkUrl };
 
       if(editingId){
         await ZgobStore.updateDesign(editingId, payload);
@@ -237,6 +256,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td><strong>${zgobEscape(d.title)}</strong></td>
         <td>${zgobEscape(d.category)}</td>
         <td>$${Number(d.price).toFixed(2)}</td>
+        <td>${d.artwork_url
+          ? `<span class="status status-ok">Ready to use</span>`
+          : `<span class="status status-low">None — text only</span>`}</td>
         <td style="display:flex; gap:6px;">
           <button class="icon-btn edit-design" data-id="${d.id}">Edit</button>
           <button class="icon-btn delete-design" data-id="${d.id}">Delete</button>
@@ -264,6 +286,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           designPhotoPreview.src = d.image_url;
         }else{
           designPhotoPreviewWrap.style.display = 'none';
+        }
+        designArtworkFile = null;
+        designArtworkUrl = d.artwork_url || null;
+        designArtworkInput.value = '';
+        if(d.artwork_url){
+          designArtworkName.style.display = 'block';
+          designArtworkName.textContent = 'Current: ' + d.artwork_url.split('/').pop();
+        }else{
+          designArtworkName.style.display = 'none';
         }
         window.scrollTo({ top: document.querySelector('.card').offsetTop - 20, behavior: 'smooth' });
       });
