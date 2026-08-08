@@ -43,9 +43,6 @@ cd zgob-apparel
 vercel --prod
 ```
 
-<<<<<<< HEAD
-Either way, no environment variables are required on Vercel — the Supabase URL/key live in `js/config.js` since they're safe to ship to the browser.
-=======
 Either way, no environment variables are required on Vercel for the Supabase side — the Supabase URL/key live in `js/config.js` since they're safe to ship to the browser. The Printful mockup feature below does need Vercel-side environment variables.
 
 ## 5. Photo-realistic previews (Printful Mockup Generator)
@@ -78,18 +75,30 @@ never reaches the browser.
 - Only `"front"`/`"back"` placements are mapped by default (see `PLACEMENT_MAP` in `server/printful.js`). "Left chest" and "Sleeve" currently fall back to `"front"` since valid placement keys are product-specific — confirm the exact keys for your chosen product via `GET /mockup-generator/printfiles/{product_id}` and update the map once you know them.
 - This calls Printful's free Mockup Generator API directly — no Printful order or charge happens from generating a preview.
 - If `PRINTFUL_API_KEY` isn't set, the button will show a clear error rather than hang.
->>>>>>> 896480a3b1e53b1e45ce804c9f44566616f19b5f
 
-## What's wired up
+## 6. Real product-photo compositing (no external API)
+
+As an alternative to Printful — or in addition to it — the Customize page can composite designs onto **your own real garment photos**, entirely client-side. No API key, no network round trip, no per-garment catalog mapping required.
+
+**How it works:** `js/compositor.js` splits the print area into two triangles and solves an affine transform for each (the standard trick for warping a flat image onto an arbitrary quadrilateral in a `<canvas>`, since Canvas 2D has no native 4-point perspective transform). It then re-draws the original photo on top with an `overlay` blend, clipped to that same area — this reapplies the fabric's own folds and shading so the design looks printed on, not pasted on.
+
+**Setup:**
+1. Get one clean, front-facing, well-lit blank-garment photo per garment/colour you want this to work for. You need to supply or license these — I can't generate or provide stock photography.
+2. Host each photo somewhere public (your repo's `/photos` folder, or the Supabase `artwork` bucket).
+3. Open `/calibrate.html` (linked from the admin dashboard). Upload the photo, click its print area's four corners in order (top-left → top-right → bottom-right → bottom-left), fill in the garment/colour/hosted-URL fields, and it shows a live preview plus the exact config snippet to copy.
+4. Paste that snippet into `ZGOB_GARMENT_PHOTOS` in `js/garment-photos.js`.
+5. Commit, push, redeploy.
+
+Once a garment/colour combo is calibrated, Customize prefers it automatically over Printful — it's instant, with no "pending" wait. Anything not yet calibrated falls back to Printful (if that garment has a catalog product mapped) or shows a quiet "not available yet" note otherwise, without blocking the sketch preview.
+
+
 
 | Feature | Where |
 |---|---|
 | Browse designs / inventory | Public read via RLS, no login needed |
 | Submit a custom order (Customize page) | Public insert; optional artwork upload goes to the `artwork` storage bucket |
-<<<<<<< HEAD
-=======
-| Photo-realistic mockup preview | `api/mockup-create.js` + `api/mockup-status.js` (Vercel) proxy Printful's Mockup Generator API |
->>>>>>> 896480a3b1e53b1e45ce804c9f44566616f19b5f
+| Photo-realistic mockup preview | `js/compositor.js` (real-photo warp+shade, preferred) with `api/mockup-create.js`/`api/mockup-status.js` (Printful) as fallback |
+| Calibrating a garment photo | `/calibrate.html` — click 4 corners, copy the generated config |
 | Send a message (Contact page) | Public insert |
 | Admin panel (`/admin`) | Real Supabase Auth sign-in; view/update/delete orders, edit stock, manage messages |
 

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calibrate garment photo — Zgob Apparel</title>
+<link rel="stylesheet" href="css/styles.css">
+<style>
+  .calib-wrap{ display:grid; grid-template-columns: 1.3fr 1fr; gap: 30px; align-items:start; }
+  @media (max-width: 900px){ .calib-wrap{ grid-template-columns: 1fr; } }
+  #calibCanvas{ max-width:100%; border:1px solid var(--line); border-radius:2px; cursor:crosshair; display:block; }
+  #previewCanvasHolder canvas{ max-width:100%; border:1px solid var(--line); border-radius:2px; display:block; }
+  .step-count{ font-family:'Space Mono',monospace; font-size:12px; color:var(--thread); margin-bottom:10px; }
+  textarea#outputCode{ width:100%; min-height:160px; font-family:'Space Mono',monospace; font-size:12px; background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px; padding:12px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <ul class="nav-links">
+      <li><a href="admin.html">← Back to admin</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <section class="page-hero section-dark">
+    <div class="wrap">
+      <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Internal tool</div>
+      <h1>Calibrate a garment photo</h1>
+      <p>Upload a real blank-garment photo, click its print area's four corners in order (top-left → top-right → bottom-right → bottom-left), and copy the generated config into <code style="color:var(--canvas);">js/garment-photos.js</code>.</p>
+    </div>
+  </section>
+
+  <section class="section-dark" style="padding-top:40px;">
+    <div class="wrap calib-wrap">
+
+      <div>
+        <div class="card">
+          <div class="form-field" style="margin-bottom:14px;">
+            <label for="photoFile">1. Upload the garment photo</label>
+            <input type="file" id="photoFile" accept="image/*">
+          </div>
+          <div class="step-count" id="stepCount">Click 4 points: top-left → top-right → bottom-right → bottom-left</div>
+          <canvas id="calibCanvas"></canvas>
+          <div style="margin-top:14px; display:flex; gap:10px;">
+            <button class="btn btn-small" id="resetPointsBtn" type="button">Reset points</button>
+            <button class="btn btn-small" id="undoPointBtn" type="button">Undo last point</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="font-size:15px; margin-bottom:14px;">2. Garment &amp; colour</h3>
+          <div class="form-row">
+            <div class="form-field" style="margin-bottom:0;">
+              <label for="garmentName">Garment</label>
+              <select id="garmentName">
+                <option>Classic Tee</option>
+                <option>Heavyweight Hoodie</option>
+                <option>Long Sleeve Tee</option>
+                <option>Crewneck Sweatshirt</option>
+                <option>Cropped Tee</option>
+                <option>Tank Top</option>
+              </select>
+            </div>
+            <div class="form-field" style="margin-bottom:0;">
+              <label for="colorName">Colour</label>
+              <select id="colorName">
+                <option>Canvas</option>
+                <option>Ink</option>
+                <option>Denim</option>
+                <option>Thread Red</option>
+                <option>Mustard</option>
+                <option>Chalk</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-field" style="margin-top:16px; margin-bottom:0;">
+            <label for="photoUrl">Where this photo will be hosted (final URL)</label>
+            <input type="text" id="photoUrl" placeholder="/photos/classic-tee-canvas.jpg">
+            <p class="graphite-text" style="font-size:12px; margin-top:8px;">
+              Upload the same image file somewhere public (your repo's <code>/photos</code> folder, or the Supabase <code>artwork</code> bucket) and put that URL here — this tool only uses your local file for the live preview.
+            </p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="font-size:15px; margin-bottom:14px;">3. Live preview</h3>
+          <p class="graphite-text" style="font-size:12px; margin-bottom:12px;">A placeholder "ZGOB" design, warped onto your 4 points, with fabric shading reapplied — this is exactly what customers will see.</p>
+          <div id="previewCanvasHolder"><div class="empty-state">Upload a photo and click 4 points to see a preview</div></div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size:15px; margin-bottom:14px;">4. Copy into js/garment-photos.js</h3>
+          <textarea id="outputCode" readonly placeholder="Waiting for 4 points…"></textarea>
+          <button class="btn btn-small" id="copyBtn" type="button" style="margin-top:12px;">Copy to clipboard</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<script src="js/compositor.js"></script>
+<script>
+(() => {
+  const canvas = document.getElementById('calibCanvas');
+  const ctx = canvas.getContext('2d');
+  let img = null;
+  let scale = 1;      // displayed-size -> natural-pixel-size factor
+  let points = [];    // in NATURAL photo pixel coordinates
+
+  const stepCount = document.getElementById('stepCount');
+  const outputCode = document.getElementById('outputCode');
+  const previewHolder = document.getElementById('previewCanvasHolder');
+
+  document.getElementById('photoFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    img = await zgobLoadImage(url);
+    points = [];
+
+    const maxDisplayWidth = 640;
+    scale = img.naturalWidth > maxDisplayWidth ? maxDisplayWidth / img.naturalWidth : 1;
+    canvas.width = img.naturalWidth * scale;
+    canvas.height = img.naturalHeight * scale;
+    redraw();
+    updateOutput();
+  });
+
+  canvas.addEventListener('click', (e) => {
+    if(!img || points.length >= 4) return;
+    const rect = canvas.getBoundingClientRect();
+    const displayX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const displayY = (e.clientY - rect.top) * (canvas.height / rect.height);
+    points.push([displayX / scale, displayY / scale]); // store in natural pixel coords
+    redraw();
+    updateOutput();
+  });
+
+  document.getElementById('resetPointsBtn').addEventListener('click', () => {
+    points = [];
+    redraw();
+    updateOutput();
+  });
+  document.getElementById('undoPointBtn').addEventListener('click', () => {
+    points.pop();
+    redraw();
+    updateOutput();
+  });
+
+  function redraw(){
+    if(!img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = '#d6432a';
+    ctx.fillStyle = '#d6432a';
+    ctx.lineWidth = 2;
+
+    const displayPoints = points.map(([x, y]) => [x * scale, y * scale]);
+    displayPoints.forEach(([x, y], i) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = 'bold 12px monospace';
+      const labels = ['TL', 'TR', 'BR', 'BL'];
+      ctx.fillText(labels[i], x + 8, y - 8);
+    });
+    if(displayPoints.length > 1){
+      ctx.beginPath();
+      ctx.moveTo(displayPoints[0][0], displayPoints[0][1]);
+      displayPoints.slice(1).forEach(([x, y]) => ctx.lineTo(x, y));
+      if(displayPoints.length === 4) ctx.closePath();
+      ctx.stroke();
+    }
+
+    const remaining = 4 - points.length;
+    const labelsLeft = ['top-left', 'top-right', 'bottom-right', 'bottom-left'].slice(points.length);
+    stepCount.textContent = remaining > 0
+      ? `Click next: ${labelsLeft[0]} (${remaining} point${remaining > 1 ? 's' : ''} left)`
+      : 'All 4 points set — see the preview and code on the right.';
+  }
+
+  async function updateOutput(){
+    const garment = document.getElementById('garmentName').value;
+    const color = document.getElementById('colorName').value;
+    const photoUrl = document.getElementById('photoUrl').value.trim() || '/photos/your-photo.jpg';
+
+    if(points.length < 4){
+      outputCode.value = '';
+      previewHolder.innerHTML = '<div class="empty-state">Upload a photo and click 4 points to see a preview</div>';
+      return;
+    }
+
+    const roundedQuad = points.map(([x, y]) => [Math.round(x), Math.round(y)]);
+    outputCode.value =
+`'${garment}|${color}': {
+  photoUrl: '${photoUrl}',
+  quad: ${JSON.stringify(roundedQuad)}
+},`;
+
+    // live preview using the local photo (object URL) so it works before you've hosted it anywhere
+    try{
+      const placeholderDesignUrl = await makePlaceholderDesign();
+      const resultCanvas = await zgobCompositeMockup({
+        photoUrl: img.src,
+        quad: roundedQuad,
+        designUrl: placeholderDesignUrl
+      });
+      previewHolder.innerHTML = '';
+      resultCanvas.style.width = '100%';
+      previewHolder.appendChild(resultCanvas);
+    }catch(err){
+      previewHolder.innerHTML = `<div class="empty-state">Preview failed: ${err.message}</div>`;
+    }
+  }
+
+  function makePlaceholderDesign(){
+    return new Promise((resolve) => {
+      const c = document.createElement('canvas');
+      c.width = 500; c.height = 500;
+      const pctx = c.getContext('2d');
+      pctx.fillStyle = '#f7f3e8';
+      pctx.fillRect(0, 0, 500, 500);
+      pctx.strokeStyle = '#14120d';
+      pctx.lineWidth = 6;
+      pctx.strokeRect(10, 10, 480, 480);
+      pctx.fillStyle = '#14120d';
+      pctx.textAlign = 'center';
+      pctx.textBaseline = 'middle';
+      pctx.font = 'bold 90px Arial';
+      pctx.fillText('ZGOB', 250, 250);
+      c.toBlob(blob => resolve(URL.createObjectURL(blob)));
+    });
+  }
+
+  document.getElementById('garmentName').addEventListener('change', updateOutput);
+  document.getElementById('colorName').addEventListener('change', updateOutput);
+  document.getElementById('photoUrl').addEventListener('input', updateOutput);
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    outputCode.select();
+    navigator.clipboard.writeText(outputCode.value).then(() => {
+      const btn = document.getElementById('copyBtn');
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    });
+  });
+})();
+</script>
+</body>
+</html>

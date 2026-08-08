@@ -37,17 +37,6 @@ const ZgobStore = (() => {
     async getOrders(){
       return orThrow(await client.from('orders').select('*').order('created_at', { ascending:false }));
     },
-<<<<<<< HEAD
-    async addOrder(order){
-      // order: { name, email, garment, color, size, quantity, placement, designText, artworkFile, notes }
-      let artworkUrl = null;
-      if(order.artworkFile){
-        const path = `${Date.now()}_${order.artworkFile.name}`.replace(/\s+/g, '_');
-        const upload = await client.storage.from('artwork').upload(path, order.artworkFile);
-        if(upload.error) throw upload.error;
-        artworkUrl = client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
-      }
-=======
     /** Upload a File (or a canvas-rendered Blob) to the public artwork bucket, return its URL. */
     async uploadArtwork(fileOrBlob, filenameHint){
       const name = (filenameHint || fileOrBlob.name || 'artwork.png').replace(/\s+/g, '_');
@@ -58,7 +47,6 @@ const ZgobStore = (() => {
     },
     async addOrder(order){
       // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, notes }
->>>>>>> 896480a3b1e53b1e45ce804c9f44566616f19b5f
       const row = {
         name: order.name,
         email: order.email,
@@ -68,11 +56,7 @@ const ZgobStore = (() => {
         quantity: order.quantity,
         placement: order.placement,
         design_text: order.designText || null,
-<<<<<<< HEAD
-        artwork_url: artworkUrl,
-=======
         artwork_url: order.artworkUrl || null,
->>>>>>> 896480a3b1e53b1e45ce804c9f44566616f19b5f
         notes: order.notes || null
       };
       return orThrow(await client.from('orders').insert(row).select().single());

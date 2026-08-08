@@ -40,9 +40,7 @@
           <span class="crosshair tl"></span><span class="crosshair tr"></span>
           <span class="crosshair bl"></span><span class="crosshair br"></span>
           <div id="previewGarment"></div>
-          <canvas id="templateCanvas" style="display:none;"></canvas>
         </div>
-        <p class="graphite-text" id="templateDragHint" style="font-size:12px; margin-top:10px; display:none;">Drag the box to move it, drag the bottom-right corner to resize.</p>
         <div class="card" style="margin-top:20px;">
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">GARMENT</span>
@@ -64,22 +62,27 @@
             <span class="dot"></span><span id="printAreaHintText">No design yet — add text or upload artwork below</span>
           </div>
         </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px;">
+            <div>
+              <h3 style="font-size:15px; margin:0;">Photo-realistic preview</h3>
+              <p class="graphite-text" style="font-size:12px; margin:4px 0 0;">Renders your design on a real product photo via Printful.</p>
+            </div>
+          </div>
+          <button type="button" id="mockupBtn" class="btn btn-block" disabled>Generate photo-realistic preview →</button>
+          <p class="graphite-text" style="font-size:11px; margin-top:8px;">Regenerates automatically about a second after you change your design, garment, colour, size, or placement.</p>
+          <p id="mockupStatus" class="graphite-text" style="font-size:12px; margin-top:10px; display:none;"></p>
+          <div id="mockupResult" style="display:none; margin-top:16px;">
+            <img id="mockupImage" alt="Photo-realistic mockup" style="width:100%; border-radius:2px; border:1px solid var(--line);">
+            <button type="button" id="mockupClearBtn" class="btn btn-small" style="margin-top:10px;">Back to sketch view</button>
+          </div>
+        </div>
       </div>
 
       <!-- FORM -->
       <form id="customizeForm" novalidate>
         <div class="callout" id="prefillNote" style="display:none; margin-bottom:26px;"></div>
-
-        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">Optional · Use your own product photo</h3>
-        <div class="form-field">
-          <label for="templateFile">Upload a photo of the actual garment (front-facing, plain background works best)</label>
-          <input type="file" id="templateFile" accept="image/*">
-          <p class="graphite-text" style="font-size:12px; margin-top:8px;">When you add a photo, we'll drop your design onto it instead of the sketch preview — drag it into place below. Leave this blank to use the standard preview.</p>
-          <p class="artwork-filename" id="templateFileName" style="display:none;"></p>
-          <button type="button" class="btn btn-small" id="clearTemplateBtn" style="display:none; margin-top:10px;">Remove photo, use standard preview</button>
-        </div>
-
-        <hr class="cut-line" style="margin: 26px 0;">
 
         <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">01 · Garment</h3>
         <div class="chip-group" id="garmentPicker" style="margin:14px 0 26px;"></div>
@@ -162,6 +165,9 @@
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
 <script src="js/garments.js"></script>
+<script src="js/compositor.js"></script>
+<script src="js/garment-photos.js"></script>
+<script src="js/mockup.js"></script>
 <script src="js/main.js"></script>
 <script>
 (async () => {
@@ -187,21 +193,12 @@
     garment: GARMENTS[0],
     color: COLORS[0],
     text: '',
-    artworkUrl: null,
-    artworkImg: null,      // loaded Image for the uploaded artwork, used by the canvas compositor
-    templateUrl: null,     // uploaded product-photo URL, when set we render the canvas instead of the SVG
-    templateImg: null,     // loaded Image for that photo
-    box: { x: 0.32, y: 0.28, w: 0.36, h: 0.34 }, // design placement box, in fractions of the photo
+    artworkUrl: null,      // local blob: URL, used only for the instant SVG sketch preview
+    artworkFile: null,     // the actual File, if one was chosen
+    uploadedArtworkUrl: null,  // real public URL once uploaded to storage (needed for Printful or order submission)
+    localTextDesignUrl: null,  // local blob: URL for a text-only design, used by the real-photo compositor
+    lastMockupBlobUrl: null,   // the currently-shown composited/Printful result, so we can revoke it before replacing
   };
-
-  function loadImage(url){
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = url;
-    });
-  }
 
   // approximate print-area box per placement, in the garment SVG's own 300x320 coordinate space
   const PLACEMENT_BOXES = {
@@ -237,7 +234,7 @@
     el.innerHTML = GARMENTS.map(g => `<button type="button" class="chip ${g.id===state.garment.id?'selected':''}" data-id="${g.id}">${g.name}</button>`).join('');
     el.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
       state.garment = GARMENTS.find(g => g.id === btn.dataset.id);
-      renderGarmentPicker(); renderPreview();
+      renderGarmentPicker(); renderPreview(); scheduleAutoMockup();
     }));
   }
 
@@ -246,7 +243,7 @@
     el.innerHTML = COLORS.map(c => `<button type="button" class="swatch-btn ${c.name===state.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
     el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
       state.color = COLORS.find(c => c.name === btn.dataset.name);
-      renderColorPicker(); renderPreview();
+      renderColorPicker(); renderPreview(); scheduleAutoMockup();
     }));
   }
 
@@ -314,195 +311,180 @@
     }
   }
 
-  // --- canvas compositor for a user-uploaded product photo ---
-  const templateCanvas = document.getElementById('templateCanvas');
-  const tctx = templateCanvas.getContext('2d');
-  let dragMode = null; // null | 'move' | 'resize'
-  let dragOffset = { x: 0, y: 0 };
-  const HANDLE_PX = 16;
-
-  function sampleBrightness(px, py, pw, ph){
-    try{
-      const data = tctx.getImageData(Math.max(0,px|0), Math.max(0,py|0), Math.max(1,pw|0), Math.max(1,ph|0)).data;
-      let sum = 0, count = 0;
-      for(let i = 0; i < data.length; i += 40){ // sparse sample for speed
-        sum += 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
-        count++;
-      }
-      return count ? sum / count / 255 : 0.5;
-    }catch(err){ return 0.5; } // canvas not painted yet / cross-origin — fall back to mid grey
-  }
-
-  function drawTemplateCanvas(){
-    if(!state.templateImg) return;
-    const img = state.templateImg;
-    const maxDim = 560;
-    const scale = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1) || 1;
-    const w = Math.round(img.naturalWidth * scale) || maxDim;
-    const h = Math.round(img.naturalHeight * scale) || maxDim;
-    if(templateCanvas.width !== w || templateCanvas.height !== h){
-      templateCanvas.width = w; templateCanvas.height = h;
-    }
-    tctx.clearRect(0, 0, w, h);
-    tctx.drawImage(img, 0, 0, w, h);
-
-    const box = state.box;
-    const px = box.x * w, py = box.y * h, pw = box.w * w, ph = box.h * h;
-
-    if(state.artworkImg){
-      tctx.save();
-      tctx.beginPath(); tctx.rect(px, py, pw, ph); tctx.clip();
-      // multiply blend so the photo's fabric shading/folds still show through the design
-      tctx.globalCompositeOperation = 'multiply';
-      const ai = state.artworkImg;
-      const arScale = Math.max(pw / ai.naturalWidth, ph / ai.naturalHeight);
-      const aw = ai.naturalWidth * arScale, ah = ai.naturalHeight * arScale;
-      tctx.drawImage(ai, px + (pw-aw)/2, py + (ph-ah)/2, aw, ah);
-      tctx.restore();
-    }else{
-      const label = (state.text || 'YOUR DESIGN').slice(0, 24);
-      const brightness = sampleBrightness(px, py, pw, ph);
-      const ink = brightness > 0.55 ? '#14120d' : '#f7f3e8';
-      tctx.save();
-      tctx.strokeStyle = ink; tctx.globalAlpha = 0.8; tctx.lineWidth = 1.5;
-      tctx.setLineDash([6, 5]);
-      tctx.strokeRect(px, py, pw, ph);
-      tctx.globalAlpha = 1;
-      if(state.text){
-        tctx.fillStyle = ink;
-        let fontSize = Math.min(ph * 0.3, pw / (label.length * 0.58));
-        fontSize = Math.max(10, Math.min(fontSize, 34));
-        tctx.font = `700 ${fontSize}px Archivo Black, sans-serif`;
-        tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
-        tctx.fillText(label, px + pw/2, py + ph/2);
-      }else{
-        tctx.fillStyle = ink; tctx.globalAlpha = 0.85;
-        tctx.font = `700 11px Space Mono, monospace`;
-        tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
-        tctx.fillText('YOUR DESIGN', px + pw/2, py + ph/2);
-      }
-      tctx.restore();
-    }
-
-    // resize handle, always visible in edit mode
-    tctx.save();
-    tctx.fillStyle = '#d6432a';
-    tctx.fillRect(px + pw - 10, py + ph - 10, 10, 10);
-    tctx.strokeStyle = '#14120d'; tctx.lineWidth = 1;
-    tctx.strokeRect(px + pw - 10, py + ph - 10, 10, 10);
-    tctx.restore();
-  }
-
-  function canvasPointFromEvent(e){
-    const rect = templateCanvas.getBoundingClientRect();
-    const scaleX = templateCanvas.width / rect.width;
-    const scaleY = templateCanvas.height / rect.height;
-    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-  }
-
-  templateCanvas.addEventListener('pointerdown', (e) => {
-    if(!state.templateImg) return;
-    const p = canvasPointFromEvent(e);
-    const box = state.box, w = templateCanvas.width, h = templateCanvas.height;
-    const px = box.x*w, py = box.y*h, pw = box.w*w, ph = box.h*h;
-    if(p.x >= px+pw-HANDLE_PX && p.x <= px+pw+HANDLE_PX && p.y >= py+ph-HANDLE_PX && p.y <= py+ph+HANDLE_PX){
-      dragMode = 'resize';
-    }else if(p.x >= px && p.x <= px+pw && p.y >= py && p.y <= py+ph){
-      dragMode = 'move';
-      dragOffset = { x: p.x - px, y: p.y - py };
-    }
-    if(dragMode) templateCanvas.setPointerCapture(e.pointerId);
-  });
-
-  templateCanvas.addEventListener('pointermove', (e) => {
-    if(!dragMode || !state.templateImg) return;
-    const p = canvasPointFromEvent(e);
-    const w = templateCanvas.width, h = templateCanvas.height;
-    const box = state.box;
-    if(dragMode === 'move'){
-      box.x = Math.min(1 - box.w, Math.max(0, (p.x - dragOffset.x) / w));
-      box.y = Math.min(1 - box.h, Math.max(0, (p.y - dragOffset.y) / h));
-    }else if(dragMode === 'resize'){
-      box.w = Math.min(1 - box.x, Math.max(0.08, (p.x / w) - box.x));
-      box.h = Math.min(1 - box.y, Math.max(0.08, (p.y / h) - box.y));
-    }
-    drawTemplateCanvas();
-  });
-
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt =>
-    templateCanvas.addEventListener(evt, () => { dragMode = null; })
-  );
-
-  async function setTemplateFromFile(file){
-    if(state.templateUrl) URL.revokeObjectURL(state.templateUrl);
-    if(!file){ state.templateUrl = null; state.templateImg = null; return; }
-    state.templateUrl = URL.createObjectURL(file);
-    state.templateImg = await loadImage(state.templateUrl);
-  }
-
-  document.getElementById('templateFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0] || null;
-    await setTemplateFromFile(file);
-    const nameEl = document.getElementById('templateFileName');
-    const clearBtn = document.getElementById('clearTemplateBtn');
-    if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Using: ${file.name}`; clearBtn.style.display = 'inline-flex'; }
-    else{ nameEl.style.display = 'none'; nameEl.textContent = ''; clearBtn.style.display = 'none'; }
-    renderPreview();
-  });
-
-  document.getElementById('clearTemplateBtn').addEventListener('click', async () => {
-    await setTemplateFromFile(null);
-    document.getElementById('templateFile').value = '';
-    document.getElementById('templateFileName').style.display = 'none';
-    document.getElementById('clearTemplateBtn').style.display = 'none';
-    renderPreview();
-  });
-
   function renderPreview(){
-    const previewGarmentEl = document.getElementById('previewGarment');
-    const dragHint = document.getElementById('templateDragHint');
-
-    if(state.templateImg){
-      previewGarmentEl.style.display = 'none';
-      templateCanvas.style.display = 'block';
-      dragHint.style.display = 'block';
-      drawTemplateCanvas();
-    }else{
-      previewGarmentEl.style.display = '';
-      templateCanvas.style.display = 'none';
-      dragHint.style.display = 'none';
-      const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
-      previewGarmentEl.innerHTML = zgobGarmentSVG(svgType, state.color.hex);
-      updatePrintArea();
-    }
-
+    const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
+    document.getElementById('previewGarment').innerHTML = zgobGarmentSVG(svgType, state.color.hex);
     document.getElementById('previewGarmentName').textContent = state.garment.name;
     document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
-    document.getElementById('previewPlacement').textContent = state.templateImg ? 'Custom photo — dragged placement' : document.getElementById('placement').value;
+    document.getElementById('previewPlacement').textContent = document.getElementById('placement').value;
     const qty = Number(document.getElementById('quantity').value) || 1;
     document.getElementById('previewPrice').textContent = `$${(state.garment.price * qty).toFixed(2)}`;
-
-    if(state.templateImg){
-      const hint = document.getElementById('printAreaHint');
-      const hintText = document.getElementById('printAreaHintText');
-      if(state.artworkUrl || state.text){ hint.classList.remove('is-empty'); hintText.textContent = state.artworkUrl ? 'Artwork placed on your photo' : 'Text placed on your photo'; }
-      else{ hint.classList.add('is-empty'); hintText.textContent = 'No design yet — add text or upload artwork below'; }
+    updatePrintArea();
+    // any change to garment/color/etc. invalidates a previously generated photo mockup
+    const mockupResultEl = document.getElementById('mockupResult');
+    const garmentStageEl = document.querySelector('.garment-stage');
+    if(mockupResultEl && mockupResultEl.style.display !== 'none'){
+      mockupResultEl.style.display = 'none';
+      garmentStageEl.style.display = '';
     }
   }
 
-  document.getElementById('designText').addEventListener('input', e => { state.text = e.target.value; renderPreview(); });
-  document.getElementById('size').addEventListener('change', renderPreview);
+  document.getElementById('designText').addEventListener('input', e => {
+    state.text = e.target.value;
+    renderPreview();
+    updateMockupButtonState();
+    scheduleAutoMockup();
+  });
+  document.getElementById('size').addEventListener('change', () => { renderPreview(); scheduleAutoMockup(); });
   document.getElementById('quantity').addEventListener('input', renderPreview);
-  document.getElementById('placement').addEventListener('change', renderPreview);
-  document.getElementById('artwork').addEventListener('change', async e => {
+  document.getElementById('placement').addEventListener('change', () => { renderPreview(); scheduleAutoMockup(); });
+  document.getElementById('artwork').addEventListener('change', e => {
     if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
     const file = e.target.files[0] || null;
     state.artworkUrl = file ? URL.createObjectURL(file) : null;
-    state.artworkImg = state.artworkUrl ? await loadImage(state.artworkUrl).catch(() => null) : null;
+    state.artworkFile = file;
+    state.uploadedArtworkUrl = null; // a new/changed file needs re-uploading before a mockup can use it
     const nameEl = document.getElementById('artworkFileName');
     if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Selected: ${file.name}`; }
     else{ nameEl.style.display = 'none'; nameEl.textContent = ''; }
     renderPreview();
+    updateMockupButtonState();
+    scheduleAutoMockup();
+  });
+
+  /* ---------------- photo-realistic mockup (Printful) ---------------- */
+  const mockupBtn = document.getElementById('mockupBtn');
+  const mockupStatus = document.getElementById('mockupStatus');
+  const mockupResult = document.getElementById('mockupResult');
+  const mockupImage = document.getElementById('mockupImage');
+  const garmentStage = document.querySelector('.garment-stage');
+
+  let mockupGenerationId = 0;   // guards against a slow, stale request overwriting a newer one
+  let mockupDebounceTimer = null;
+
+  function updateMockupButtonState(){
+    const hasDesign = !!(state.artworkFile || state.text.trim());
+    mockupBtn.disabled = !hasDesign;
+  }
+  updateMockupButtonState();
+
+  async function ensureArtworkUploaded(){
+    if(state.uploadedArtworkUrl) return state.uploadedArtworkUrl;
+    if(state.artworkFile){
+      state.uploadedArtworkUrl = await ZgobStore.uploadArtwork(state.artworkFile);
+    }else if(state.text.trim()){
+      const blob = await ZgobMockup.textToImageBlob(state.text.trim());
+      state.uploadedArtworkUrl = await ZgobStore.uploadArtwork(blob, 'design-text.png');
+    }
+    return state.uploadedArtworkUrl;
+  }
+
+  /** Local-only equivalent of ensureArtworkUploaded — no network upload, just an object: URL the
+      compositor can load. Used by the real-photo path so previews stay instant while typing. */
+  async function getLocalDesignPreviewUrl(){
+    if(state.artworkFile) return state.artworkUrl; // already an object: URL from the file input handler
+    if(state.localTextDesignUrl) URL.revokeObjectURL(state.localTextDesignUrl);
+    const blob = await ZgobMockup.textToImageBlob(state.text.trim());
+    state.localTextDesignUrl = URL.createObjectURL(blob);
+    return state.localTextDesignUrl;
+  }
+
+  function setMockupStatus(msg){
+    mockupStatus.style.display = msg ? 'block' : 'none';
+    mockupStatus.textContent = msg || '';
+  }
+
+  /** Shared by the manual button and the auto-trigger. Ignores its own result if a newer run has started.
+      Priority: a calibrated real photo (instant, fully local) > Printful (needs an uploaded image + network round trip) > nothing. */
+  async function runMockupGeneration(){
+    if(!(state.artworkFile || state.text.trim())) return;
+    const myId = ++mockupGenerationId;
+
+    const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.color.name);
+
+    mockupBtn.disabled = true;
+    setMockupStatus('');
+
+    try{
+      if(photoConfig){
+        mockupBtn.textContent = 'Rendering on the photo…';
+        const localDesignUrl = await getLocalDesignPreviewUrl();
+        if(myId !== mockupGenerationId) return;
+
+        const resultCanvas = await zgobCompositeMockup({
+          photoUrl: photoConfig.photoUrl,
+          quad: photoConfig.quad,
+          designUrl: localDesignUrl
+        });
+        if(myId !== mockupGenerationId) return;
+
+        const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/png'));
+        if(myId !== mockupGenerationId) return;
+        if(state.lastMockupBlobUrl) URL.revokeObjectURL(state.lastMockupBlobUrl);
+        state.lastMockupBlobUrl = URL.createObjectURL(blob);
+        mockupImage.src = state.lastMockupBlobUrl;
+        mockupResult.style.display = 'block';
+        garmentStage.style.display = 'none';
+        setMockupStatus('');
+      }else{
+        // no calibrated photo for this garment/colour yet — try Printful as a fallback, if it's mapped
+        mockupBtn.textContent = 'Uploading design…';
+        const imageUrl = await ensureArtworkUploaded();
+        if(myId !== mockupGenerationId) return;
+
+        mockupBtn.textContent = 'Starting mockup…';
+        const mockupUrl = await ZgobMockup.generate({
+          garment: state.garment.name,
+          color: state.color.name,
+          size: document.getElementById('size').value,
+          placement: document.getElementById('placement').value,
+          imageUrl
+        }, (status) => {
+          if(myId !== mockupGenerationId) return;
+          mockupBtn.textContent = status === 'pending' ? 'Rendering on the garment…' : `Status: ${status}…`;
+        });
+
+        if(myId !== mockupGenerationId) return;
+        mockupImage.src = mockupUrl;
+        mockupResult.style.display = 'block';
+        garmentStage.style.display = 'none';
+        setMockupStatus('');
+      }
+    }catch(err){
+      if(myId !== mockupGenerationId) return;
+      // fail quietly into the sketch view rather than blocking the page — the sketch already
+      // reflects the current design, so a failed photo attempt shouldn't feel like a dead end
+      setMockupStatus(err.message || 'No photo-realistic preview available for this garment/colour yet.');
+      console.error(err);
+    }finally{
+      if(myId === mockupGenerationId){
+        mockupBtn.disabled = false;
+        mockupBtn.textContent = 'Regenerate photo-realistic preview →';
+        updateMockupButtonState();
+      }
+    }
+  }
+
+  /** Called after any change to garment/colour/size/placement/design. Auto-generates ~1s after things settle. */
+  function scheduleAutoMockup(){
+    clearTimeout(mockupDebounceTimer);
+    mockupGenerationId++; // invalidate any in-flight run so its result won't land after this edit
+    if(!(state.artworkFile || state.text.trim())){
+      setMockupStatus('');
+      return;
+    }
+    mockupDebounceTimer = setTimeout(runMockupGeneration, 1000);
+  }
+
+  mockupBtn.addEventListener('click', () => {
+    clearTimeout(mockupDebounceTimer);
+    runMockupGeneration();
+  });
+
+  document.getElementById('mockupClearBtn').addEventListener('click', () => {
+    mockupResult.style.display = 'none';
+    garmentStage.style.display = '';
+    setMockupStatus('');
   });
 
   renderGarmentPicker();
@@ -517,56 +499,33 @@
 
     const submitBtn = formEl.querySelector('button[type=submit]');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Uploading artwork…';
-
-    // Upload the artwork first so we can send addOrder a plain URL.
-    // In custom-photo mode we upload the *final composited preview* (photo + design
-    // merged) so the print team sees exactly what the customer saw, not just the raw logo.
-    let artworkUrl = null;
-    try{
-      if(state.templateImg){
-        const blob = await new Promise(resolve => templateCanvas.toBlob(resolve, 'image/png'));
-        if(blob) artworkUrl = await ZgobStore.uploadArtwork(blob, 'composited-mockup.png');
-      }else{
-        const artworkFile = document.getElementById('artwork').files[0] || null;
-        if(artworkFile) artworkUrl = await ZgobStore.uploadArtwork(artworkFile, artworkFile.name);
-      }
-    }catch(uploadErr){
-      zgobToast('Could not upload artwork — please try again.');
-      console.error(uploadErr);
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Submit custom order →';
-      return;
-    }
-
     submitBtn.textContent = 'Sending order…';
 
-    const order = {
-      name: fullName,
-      email,
-      garment: state.garment.name,
-      color: state.color.name,
-      size: document.getElementById('size').value,
-      quantity: Number(document.getElementById('quantity').value) || 1,
-      placement: state.templateImg ? 'Custom photo — dragged placement' : document.getElementById('placement').value,
-      designText: document.getElementById('designText').value.trim(),
-      artworkUrl,
-      notes: document.getElementById('notes').value.trim()
-    };
-
     try{
+      const artworkUrl = await ensureArtworkUploaded();
+      const order = {
+        name: fullName,
+        email,
+        garment: state.garment.name,
+        color: state.color.name,
+        size: document.getElementById('size').value,
+        quantity: Number(document.getElementById('quantity').value) || 1,
+        placement: document.getElementById('placement').value,
+        designText: document.getElementById('designText').value.trim(),
+        artworkUrl,
+        notes: document.getElementById('notes').value.trim()
+      };
       await ZgobStore.addOrder(order);
       zgobToast('Order sent! We\'ll follow up by email to confirm your proof.');
       formEl.reset();
       state.text = '';
-      if(state.artworkUrl){ URL.revokeObjectURL(state.artworkUrl); state.artworkUrl = null; state.artworkImg = null; }
+      state.artworkFile = null;
+      state.uploadedArtworkUrl = null;
+      if(state.artworkUrl){ URL.revokeObjectURL(state.artworkUrl); state.artworkUrl = null; }
       const nameEl = document.getElementById('artworkFileName');
       nameEl.style.display = 'none'; nameEl.textContent = '';
-      await setTemplateFromFile(null);
-      document.getElementById('templateFileName').style.display = 'none';
-      document.getElementById('clearTemplateBtn').style.display = 'none';
-      state.box = { x: 0.32, y: 0.28, w: 0.36, h: 0.34 };
       renderPreview();
+      updateMockupButtonState();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }catch(err){
       zgobToast('Something went wrong sending your order — please try again.');
