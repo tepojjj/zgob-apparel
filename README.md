@@ -4,6 +4,12 @@ This site is a static frontend (plain HTML/CSS/JS, no build step) backed by
 Supabase for the database, file storage, and admin authentication. Deploying
 takes about 10 minutes.
 
+> **Already have this deployed?** This version adds a `quad` column to
+> `garment_photos` and a `reference_mockup_url` column to `orders`. Re-run
+> the full `supabase/schema.sql` in your Supabase SQL Editor — every
+> statement in it is safe to run again (it uses `if not exists` / `upsert`
+> throughout), so this won't touch your existing data.
+
 ## 1. Create the Supabase project
 
 1. Go to [supabase.com](https://supabase.com) → **New project**. Pick any name/region and a database password (you won't need the password day-to-day — Supabase Auth handles admin login separately).
@@ -78,18 +84,28 @@ never reaches the browser.
 
 ## 6. Real product-photo compositing (no external API)
 
-As an alternative to Printful — or in addition to it — the Customize page can composite designs onto **your own real garment photos**, entirely client-side. No API key, no network round trip, no per-garment catalog mapping required.
+As an alternative to Printful — or in addition to it — the Customize page can composite designs onto **your own real garment photos**, entirely client-side. No API key, no network round trip, no per-garment catalog mapping required. This is the preferred path whenever it's available: Customize checks for a calibrated photo first and only falls back to Printful if one isn't set up yet.
 
 **How it works:** `js/compositor.js` splits the print area into two triangles and solves an affine transform for each (the standard trick for warping a flat image onto an arbitrary quadrilateral in a `<canvas>`, since Canvas 2D has no native 4-point perspective transform). It then re-draws the original photo on top with an `overlay` blend, clipped to that same area — this reapplies the fabric's own folds and shading so the design looks printed on, not pasted on.
 
 **Setup:**
 1. Get one clean, front-facing, well-lit blank-garment photo per garment/colour you want this to work for. You need to supply or license these — I can't generate or provide stock photography.
-2. Host each photo somewhere public (your repo's `/photos` folder, or the Supabase `artwork` bucket).
-3. Open `/calibrate.html` (linked from the admin dashboard). Upload the photo, click its print area's four corners in order (top-left → top-right → bottom-right → bottom-left), fill in the garment/colour/hosted-URL fields, and it shows a live preview plus the exact config snippet to copy.
-4. Paste that snippet into `ZGOB_GARMENT_PHOTOS` in `js/garment-photos.js`.
-5. Commit, push, redeploy.
+2. Open `/calibrate.html` (linked from the admin dashboard). Pick the garment + colour, upload the photo, then **click the four corners of the print area directly on the photo**, in order: top-left → top-right → bottom-right → bottom-left. Each click plots a numbered point and the tool draws the outline live as you go, so you can see exactly what you're calibrating.
+3. Use **Preview with test design** to composite a quick test pattern onto your four points before committing — if it looks skewed, click **Reset points** and try again.
+4. Click **Save reference photo**. That's it — no config file to edit, no redeploy needed. The photo and its four corners are stored in Supabase (`garment_photos` table) and Customize picks it up automatically the next time that garment/colour is selected.
+5. To fix a photo you calibrated before, click **Calibrate** on its card in the saved-photos grid — it reloads the same photo so you can re-plot the corners and re-save.
 
-Once a garment/colour combo is calibrated, Customize prefers it automatically over Printful — it's instant, with no "pending" wait. Anything not yet calibrated falls back to Printful (if that garment has a catalog product mapped) or shows a quiet "not available yet" note otherwise, without blocking the sketch preview.
+Once a garment/colour combo is calibrated this way, Customize prefers it automatically over Printful — it's instant, with no "pending" wait. Anything not yet calibrated falls back to Printful (if that garment has a catalog product mapped) or shows a quiet "not available yet" note otherwise, without blocking the sketch preview.
+
+## 7. Customers uploading their own design or mockup
+
+Customize supports two different things a shopper might hand you, and they're intentionally kept separate:
+
+- **"Upload artwork"** — a print-ready file (logo, graphic, text) meant to go *onto* the garment. This feeds the sketch preview, the photo-realistic compositor/Printful preview, and gets attached to the order as the file to print.
+- **"Already have your own mockup or reference image?"** — for a shopper who's already put together their own mockup elsewhere (their own composite, a reference photo, whatever) and just wants to show you what they're picturing. Uploading here replaces our own preview entirely with their image, skips mockup generation, and attaches their file to the order as reference — it's not treated as print-ready artwork.
+
+Both end up as URLs on the order (`artwork_url` and `reference_mockup_url`) that show up as links in the admin orders table.
+
 
 
 
@@ -98,7 +114,8 @@ Once a garment/colour combo is calibrated, Customize prefers it automatically ov
 | Browse designs / inventory | Public read via RLS, no login needed |
 | Submit a custom order (Customize page) | Public insert; optional artwork upload goes to the `artwork` storage bucket |
 | Photo-realistic mockup preview | `js/compositor.js` (real-photo warp+shade, preferred) with `api/mockup-create.js`/`api/mockup-status.js` (Printful) as fallback |
-| Calibrating a garment photo | `/calibrate.html` — click 4 corners, copy the generated config |
+| Customer's own already-made mockup | Separate upload field on Customize — bypasses our preview, attaches as `reference_mockup_url` on the order |
+| Calibrating a garment photo | `/calibrate.html` — click 4 corners, save directly (stored in Supabase, no config file to edit) |
 | Send a message (Contact page) | Public insert |
 | Admin panel (`/admin`) | Real Supabase Auth sign-in; view/update/delete orders, edit stock, manage messages |
 

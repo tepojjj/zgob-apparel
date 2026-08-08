@@ -6,15 +6,28 @@
 <title>Garment reference photos — Zgob Apparel</title>
 <link rel="stylesheet" href="css/styles.css">
 <style>
-  .ref-wrap{ display:grid; grid-template-columns: 1fr 1.2fr; gap: 30px; align-items:start; }
+  .ref-wrap{ display:grid; grid-template-columns: 1.15fr 1fr; gap: 30px; align-items:start; }
   @media (max-width: 900px){ .ref-wrap{ grid-template-columns: 1fr; } }
-  #refPreviewWrap img{ width:100%; border:1px solid var(--line); border-radius:2px; display:block; margin-top:10px; }
   .ref-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:16px; }
   .ref-card{ border:1px solid var(--line); border-radius:2px; overflow:hidden; background:var(--ink-2); }
   .ref-card img{ width:100%; aspect-ratio:1; object-fit:cover; display:block; }
   .ref-card-body{ padding:10px 12px; }
   .ref-card-body strong{ display:block; font-size:14px; }
   .ref-card-body span{ font-family:'Space Mono',monospace; font-size:11px; color:var(--graphite); text-transform:uppercase; }
+  .ref-card-actions{ display:flex; gap:8px; margin-top:8px; }
+
+  #calStageWrap{ position:relative; margin-top:14px; display:none; }
+  #calCanvas{ width:100%; display:block; border:1px solid var(--line); border-radius:2px; cursor:crosshair; background:var(--ink-2); }
+  .cal-steps{ display:flex; gap:6px; margin-top:12px; }
+  .cal-step-dot{
+    flex:1; height:4px; background:var(--line); border-radius:2px;
+  }
+  .cal-step-dot.done{ background: var(--thread); }
+  .cal-coords{ font-family:'Space Mono',monospace; font-size:11px; color:var(--graphite); margin-top:10px; line-height:1.7; }
+  .cal-coords b{ color:var(--canvas); }
+  .cal-btn-row{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  #testPreviewWrap{ display:none; margin-top:18px; }
+  #testPreviewWrap img{ width:100%; border:1px solid var(--line); border-radius:2px; display:block; }
 </style>
 </head>
 <body>
@@ -33,7 +46,7 @@
     <div class="wrap">
       <div class="eyebrow"><span class="crosshair"><span class="crosshair-dot"></span></span> Internal tool</div>
       <h1>Garment reference photos</h1>
-      <p>Upload a real photo of a blank garment for a garment + colourway. It replaces the sketch anywhere that garment/colour combo shows up (right now: the homepage hero).</p>
+      <p>Upload a real photo of a blank garment, then click the four corners of the print area in order (top-left → top-right → bottom-right → bottom-left). Once it's calibrated, Customize uses this photo — with the shopper's own design warped onto it — instead of the flat sketch.</p>
     </div>
   </section>
 
@@ -41,7 +54,7 @@
     <div class="wrap ref-wrap">
 
       <div class="card">
-        <h3 style="font-size:15px; margin-bottom:14px;">Add a reference photo</h3>
+        <h3 style="font-size:15px; margin-bottom:14px;">Add / calibrate a reference photo</h3>
         <div class="form-row">
           <div class="form-field" style="margin-bottom:0;">
             <label for="garmentName">Garment</label>
@@ -70,10 +83,24 @@
           <label for="photoFile">Photo</label>
           <input type="file" id="photoFile" accept="image/*">
         </div>
-        <div id="refPreviewWrap" style="display:none;">
-          <img id="refPreviewImg" alt="Preview">
+
+        <div id="calStageWrap">
+          <canvas id="calCanvas"></canvas>
+          <div class="cal-steps" id="calSteps"></div>
+          <p class="graphite-text" id="calInstruction" style="font-size:12px; margin-top:10px;">Click the top-left corner of the print area.</p>
+          <div class="cal-coords" id="calCoords"></div>
+          <div class="cal-btn-row">
+            <button class="btn btn-small" id="undoPointBtn" type="button" disabled>Undo last point</button>
+            <button class="btn btn-small" id="resetPointsBtn" type="button" disabled>Reset points</button>
+            <button class="btn btn-small" id="testPreviewBtn" type="button" disabled>Preview with test design</button>
+          </div>
+          <div id="testPreviewWrap">
+            <img id="testPreviewImg" alt="Test composite preview">
+            <p class="graphite-text" style="font-size:11px; margin-top:6px;">Test pattern warped onto your four points — check it sits flat on the print area before saving.</p>
+          </div>
         </div>
-        <button class="btn btn-primary" id="saveRefBtn" type="button" style="margin-top:16px;" disabled>Save reference photo →</button>
+
+        <button class="btn btn-primary" id="saveRefBtn" type="button" style="margin-top:18px;" disabled>Save reference photo →</button>
         <p id="refStatus" class="graphite-text" style="font-size:12px; margin-top:10px; display:none;"></p>
       </div>
 
@@ -90,11 +117,22 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
+<script src="js/compositor.js"></script>
+<script src="js/mockup.js"></script>
 <script>
 (async () => {
   const photoFile = document.getElementById('photoFile');
-  const previewWrap = document.getElementById('refPreviewWrap');
-  const previewImg = document.getElementById('refPreviewImg');
+  const stageWrap = document.getElementById('calStageWrap');
+  const canvas = document.getElementById('calCanvas');
+  const ctx = canvas.getContext('2d');
+  const stepsEl = document.getElementById('calSteps');
+  const instructionEl = document.getElementById('calInstruction');
+  const coordsEl = document.getElementById('calCoords');
+  const undoBtn = document.getElementById('undoPointBtn');
+  const resetBtn = document.getElementById('resetPointsBtn');
+  const testBtn = document.getElementById('testPreviewBtn');
+  const testWrap = document.getElementById('testPreviewWrap');
+  const testImg = document.getElementById('testPreviewImg');
   const saveBtn = document.getElementById('saveRefBtn');
   const statusEl = document.getElementById('refStatus');
   const gridEl = document.getElementById('refGrid');
@@ -102,23 +140,133 @@
   const garmentSelect = document.getElementById('garmentName');
   const colorSelect = document.getElementById('colorName');
 
-  let pickedFile = null;
+  const STEP_LABELS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+
+  let pickedFile = null;       // a newly chosen File, if any
+  let existingImageUrl = null; // set when recalibrating a saved photo instead of uploading a new one
+  let img = null;              // the loaded <img>, natural-size source of truth
+  let scale = 1;                // canvas display px = natural image px * scale
+  let points = [];              // clicked points, in the PHOTO'S NATURAL pixel coordinates (what gets saved)
+
+  function setStatus(msg, isError){
+    statusEl.style.display = msg ? 'block' : 'none';
+    statusEl.textContent = msg || '';
+    statusEl.style.color = isError ? 'var(--thread)' : '';
+  }
+
+  function renderSteps(){
+    stepsEl.innerHTML = STEP_LABELS.map((_, i) => `<span class="cal-step-dot ${i < points.length ? 'done' : ''}"></span>`).join('');
+    if(points.length < 4){
+      instructionEl.textContent = `Click the ${STEP_LABELS[points.length]} corner of the print area.`;
+    }else{
+      instructionEl.textContent = 'All four corners plotted — preview it or save.';
+    }
+    coordsEl.innerHTML = points.map((p, i) => `<div><b>${STEP_LABELS[i]}</b> — ${Math.round(p[0])}, ${Math.round(p[1])}</div>`).join('')
+      || '<div>No points plotted yet.</div>';
+    undoBtn.disabled = points.length === 0;
+    resetBtn.disabled = points.length === 0;
+    testBtn.disabled = points.length !== 4;
+    saveBtn.disabled = points.length !== 4 || (!pickedFile && !existingImageUrl);
+  }
+
+  /** Redraws the photo plus numbered dots + connecting lines for whatever's been plotted so far — this IS the "plotting sketch". */
+  function redrawCanvas(){
+    if(!img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    if(!points.length) return;
+
+    ctx.save();
+    ctx.strokeStyle = '#d6432a';
+    ctx.fillStyle = 'rgba(214,67,42,0.18)';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    points.forEach(([nx, ny], i) => {
+      const x = nx * scale, y = ny * scale;
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    if(points.length === 4) ctx.closePath();
+    if(points.length > 1){ ctx.stroke(); if(points.length === 4) ctx.fill(); }
+
+    points.forEach(([nx, ny], i) => {
+      const x = nx * scale, y = ny * scale;
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.fillStyle = '#d6432a';
+      ctx.fill();
+      ctx.strokeStyle = '#14120d';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#f7f3e8';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i + 1), x, y + 1);
+    });
+    ctx.restore();
+  }
+
+  function loadImageIntoCanvas(src){
+    img = new Image();
+    img.onload = () => {
+      const maxW = 680;
+      scale = Math.min(1, maxW / img.naturalWidth);
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      points = [];
+      testWrap.style.display = 'none';
+      stageWrap.style.display = 'block';
+      redrawCanvas();
+      renderSteps();
+    };
+    img.onerror = () => setStatus('Could not load that image.', true);
+    img.src = src;
+  }
 
   photoFile.addEventListener('change', () => {
     pickedFile = photoFile.files[0] || null;
-    if(pickedFile){
-      previewImg.src = URL.createObjectURL(pickedFile);
-      previewWrap.style.display = 'block';
-    }else{
-      previewWrap.style.display = 'none';
-    }
-    saveBtn.disabled = !pickedFile;
+    existingImageUrl = null; // a freshly chosen file always wins over a recalibration target
+    if(pickedFile) loadImageIntoCanvas(URL.createObjectURL(pickedFile));
+    setStatus('');
+    renderSteps();
   });
 
-  function setStatus(msg){
-    statusEl.style.display = msg ? 'block' : 'none';
-    statusEl.textContent = msg || '';
-  }
+  canvas.addEventListener('click', (e) => {
+    if(points.length >= 4) return;
+    const rect = canvas.getBoundingClientRect();
+    const displayX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const displayY = (e.clientY - rect.top) * (canvas.height / rect.height);
+    points.push([displayX / scale, displayY / scale]); // store in natural image pixels
+    redrawCanvas();
+    renderSteps();
+    testWrap.style.display = 'none';
+  });
+
+  undoBtn.addEventListener('click', () => { points.pop(); redrawCanvas(); renderSteps(); testWrap.style.display = 'none'; });
+  resetBtn.addEventListener('click', () => { points = []; redrawCanvas(); renderSteps(); testWrap.style.display = 'none'; });
+
+  testBtn.addEventListener('click', async () => {
+    if(points.length !== 4) return;
+    testBtn.disabled = true;
+    testBtn.textContent = 'Rendering…';
+    try{
+      const testBlob = await ZgobMockup.textToImageBlob('ZGOB', { width: 600, height: 600 });
+      const testDesignUrl = URL.createObjectURL(testBlob);
+      const photoSrc = pickedFile ? URL.createObjectURL(pickedFile) : existingImageUrl;
+      const resultCanvas = await zgobCompositeMockup({ photoUrl: photoSrc, quad: points, designUrl: testDesignUrl });
+      const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/png'));
+      testImg.src = URL.createObjectURL(blob);
+      testWrap.style.display = 'block';
+      URL.revokeObjectURL(testDesignUrl);
+    }catch(err){
+      setStatus('Could not render a test preview: ' + err.message, true);
+      console.error(err);
+    }finally{
+      testBtn.disabled = points.length !== 4;
+      testBtn.textContent = 'Preview with test design';
+    }
+  });
 
   async function renderGrid(){
     let rows = [];
@@ -138,8 +286,11 @@
         <img src="${row.image_url}" alt="${row.garment} in ${row.color}">
         <div class="ref-card-body">
           <strong>${row.garment}</strong>
-          <span>${row.color}</span>
-          <button class="icon-btn delete-ref" data-id="${row.id}" style="margin-top:8px;">Delete</button>
+          <span>${row.color} · ${row.quad ? 'Calibrated' : 'Not calibrated yet'}</span>
+          <div class="ref-card-actions">
+            <button class="icon-btn recalibrate-ref" data-id="${row.id}" data-garment="${row.garment}" data-color="${row.color}" data-url="${row.image_url}">Calibrate</button>
+            <button class="icon-btn delete-ref" data-id="${row.id}">Delete</button>
+          </div>
         </div>
       </div>
     `).join('');
@@ -151,30 +302,45 @@
         }
       });
     });
+    gridEl.querySelectorAll('.recalibrate-ref').forEach(btn => {
+      btn.addEventListener('click', () => {
+        garmentSelect.value = btn.dataset.garment;
+        colorSelect.value = btn.dataset.color;
+        pickedFile = null;
+        existingImageUrl = btn.dataset.url;
+        photoFile.value = '';
+        loadImageIntoCanvas(existingImageUrl);
+        setStatus('Recalibrating the saved photo for ' + btn.dataset.garment + ' / ' + btn.dataset.color + ' — click four fresh corners, then save.');
+        window.scrollTo({ top: stageWrap.getBoundingClientRect().top + window.scrollY - 100, behavior: 'smooth' });
+      });
+    });
   }
 
   saveBtn.addEventListener('click', async () => {
-    if(!pickedFile) return;
+    if(points.length !== 4 || (!pickedFile && !existingImageUrl)) return;
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Uploading…';
+    saveBtn.textContent = 'Saving…';
     setStatus('');
     try{
-      const imageUrl = await ZgobStore.uploadGarmentPhoto(pickedFile);
+      const imageUrl = pickedFile ? await ZgobStore.uploadGarmentPhoto(pickedFile) : existingImageUrl;
       await ZgobStore.saveGarmentPhoto({
         garment: garmentSelect.value,
         color: colorSelect.value,
-        imageUrl
+        imageUrl,
+        quad: points
       });
-      setStatus(`Saved — ${garmentSelect.value} in ${colorSelect.value} now uses this photo.`);
+      setStatus(`Saved and calibrated — ${garmentSelect.value} in ${colorSelect.value} now uses this photo on Customize.`);
       photoFile.value = '';
       pickedFile = null;
-      previewWrap.style.display = 'none';
+      existingImageUrl = null;
+      points = [];
+      stageWrap.style.display = 'none';
       renderGrid();
     }catch(err){
-      setStatus('Something went wrong saving that photo.');
+      setStatus('Something went wrong saving that photo: ' + err.message, true);
       console.error(err);
     }finally{
-      saveBtn.disabled = !pickedFile;
+      saveBtn.disabled = points.length !== 4;
       saveBtn.textContent = 'Save reference photo →';
     }
   });

@@ -85,6 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div>${zgobEscape(o.garment)} · ${zgobEscape(o.color)}</div>
           ${o.design_text ? `<div class="graphite-text" style="font-size:12px;">"${zgobEscape(o.design_text)}"</div>` : ''}
           ${o.artwork_url ? `<div style="font-size:12px;"><a href="${o.artwork_url}" target="_blank" rel="noopener" style="color:var(--thread);">View artwork ↗</a></div>` : ''}
+          ${o.reference_mockup_url ? `<div style="font-size:12px;"><a href="${o.reference_mockup_url}" target="_blank" rel="noopener" style="color:var(--thread);">View their mockup ↗</a></div>` : ''}
         </td>
         <td>${o.size} / ${o.quantity}</td>
         <td>${zgobEscape(o.placement || '—')}</td>

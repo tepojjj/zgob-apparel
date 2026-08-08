@@ -15,7 +15,7 @@ async function zgobLoadGarmentPhotos(){
     const rows = await ZgobStore.getGarmentPhotos();
     ZGOB_GARMENT_PHOTOS = {};
     rows.forEach(row => {
-      ZGOB_GARMENT_PHOTOS[`${row.garment}|${row.color}`] = { photoUrl: row.image_url };
+      ZGOB_GARMENT_PHOTOS[`${row.garment}|${row.color}`] = { photoUrl: row.image_url, quad: row.quad || null };
     });
   }catch(err){
     console.error('Could not load garment reference photos:', err);
@@ -24,7 +24,9 @@ async function zgobLoadGarmentPhotos(){
   }
 }
 
-/** Returns { photoUrl } for this garment+colour, or null if there's no reference photo (yet, or not loaded yet). */
+/** Returns { photoUrl, quad } for this garment+colour, or null if there's no reference photo (yet, or not loaded yet).
+    quad may still be null on the returned object if a photo was saved before it was calibrated — callers should
+    check for quad specifically before assuming the real-photo compositor path is usable. */
 function zgobFindGarmentPhoto(garmentName, colorName){
   return ZGOB_GARMENT_PHOTOS[`${garmentName}|${colorName}`] || null;
 }

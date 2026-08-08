@@ -85,7 +85,7 @@ const ZgobStore = (() => {
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
     async addOrder(order){
-      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, notes }
+      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, referenceMockupUrl, notes }
       const row = {
         name: order.name,
         email: order.email,
@@ -96,6 +96,7 @@ const ZgobStore = (() => {
         placement: order.placement,
         design_text: order.designText || null,
         artwork_url: order.artworkUrl || null,
+        reference_mockup_url: order.referenceMockupUrl || null,
         notes: order.notes || null
       };
       return orThrow(await client.from('orders').insert(row).select().single());
@@ -135,10 +136,10 @@ const ZgobStore = (() => {
       if(upload.error) throw upload.error;
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
-    /** Save (or replace) the reference photo for a garment+colour pair. */
-    async saveGarmentPhoto({ garment, color, imageUrl }){
+    /** Save (or replace) the reference photo for a garment+colour pair. quad = [[x,y]x4] print-area corners, or null if not calibrated yet. */
+    async saveGarmentPhoto({ garment, color, imageUrl, quad }){
       return orThrow(await client.from('garment_photos')
-        .upsert({ garment, color, image_url: imageUrl }, { onConflict: 'garment,color' })
+        .upsert({ garment, color, image_url: imageUrl, quad: quad || null }, { onConflict: 'garment,color' })
         .select().single());
     },
     async deleteGarmentPhoto(id){

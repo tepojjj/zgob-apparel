@@ -46,10 +46,14 @@ create table if not exists public.orders (
   placement    text,
   design_text  text,
   artwork_url  text,
+  reference_mockup_url text,  -- a finished mockup/reference image the customer already had and uploaded as-is
   notes        text,
   status       text not null default 'new' check (status in ('new','progress','done')),
   created_at   timestamptz not null default now()
 );
+
+-- migration for projects that ran an earlier version of this schema before this column existed:
+alter table public.orders add column if not exists reference_mockup_url text;
 
 create table if not exists public.messages (
   id          uuid primary key default gen_random_uuid(),
@@ -66,9 +70,13 @@ create table if not exists public.garment_photos (
   garment     text not null,  -- matches an inventory item's display name, e.g. "Heavyweight Hoodie"
   color       text not null,  -- matches a colourway name, e.g. "Canvas"
   image_url   text not null,  -- real reference photo of the blank garment
+  quad        jsonb,          -- [[x,y],[x,y],[x,y],[x,y]] print-area corners (TL,TR,BR,BL) in the photo's own pixel space, set via /calibrate.html
   created_at  timestamptz not null default now(),
   unique (garment, color)
 );
+
+-- migration for projects that ran an earlier version of this schema before this column existed:
+alter table public.garment_photos add column if not exists quad jsonb;
 
 -- ---------------------------------------------------------
 -- ROW LEVEL SECURITY
