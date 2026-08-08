@@ -36,7 +36,17 @@
 
       <!-- LIVE PREVIEW -->
       <div class="customize-preview-col">
-        <div class="garment-stage" style="min-height:420px; position:relative;">
+        <div id="ownMockupWrap" style="display:none;">
+          <div class="garment-stage" style="min-height:420px; position:relative; display:flex; align-items:center; justify-content:center; padding:14px;">
+            <span class="crosshair tl"></span><span class="crosshair tr"></span>
+            <span class="crosshair bl"></span><span class="crosshair br"></span>
+            <span class="tag" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:2;">Your uploaded mockup</span>
+            <img id="ownMockupImg" alt="Your uploaded mockup" style="max-width:100%; max-height:100%; border-radius:2px;">
+          </div>
+          <button type="button" id="clearOwnMockupBtn" class="btn btn-small" style="margin-top:12px; width:100%;">Use our live preview instead →</button>
+        </div>
+        <div id="builtPreviewWrap">
+        <div class="garment-stage" id="builtGarmentStage" style="min-height:420px; position:relative;">
           <span class="crosshair tl"></span><span class="crosshair tr"></span>
           <span class="crosshair bl"></span><span class="crosshair br"></span>
           <span class="tag" id="sketchBadge" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:2;">Sketch guide — not a real photo</span>
@@ -57,18 +67,18 @@
           </div>
           <div style="display:flex; justify-content:space-between;">
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">EST. PRICE</span>
-            <strong id="previewPrice">$24.00</strong>
+            <strong id="previewPrice">₱24.00</strong>
           </div>
           <div class="print-area-hint is-empty" id="printAreaHint">
             <span class="dot"></span><span id="printAreaHintText">No design yet — add text or upload artwork below</span>
           </div>
         </div>
 
-        <div class="card" style="margin-top:16px;">
+        <div class="card" id="mockupCard" style="margin-top:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px;">
             <div>
               <h3 style="font-size:15px; margin:0;">Photo-realistic preview</h3>
-              <p class="graphite-text" style="font-size:12px; margin:4px 0 0;">Renders your design on a real product photo via Printful.</p>
+              <p class="graphite-text" style="font-size:12px; margin:4px 0 0;">Renders your design on a real product photo — instantly if we've calibrated this garment/colour, otherwise via Printful.</p>
             </div>
           </div>
           <button type="button" id="mockupBtn" class="btn btn-block" disabled>Generate photo-realistic preview →</button>
@@ -78,6 +88,7 @@
             <img id="mockupImage" alt="Photo-realistic mockup" style="width:100%; border-radius:2px; border:1px solid var(--line);">
             <button type="button" id="mockupClearBtn" class="btn btn-small" style="margin-top:10px;">Back to sketch view</button>
           </div>
+        </div>
         </div>
       </div>
 
@@ -115,6 +126,12 @@
           <input type="file" id="artwork" accept="image/*">
           <p class="graphite-text" style="font-size:12px; margin-top:8px;">Shows up in the preview on the left, and we'll review it before printing.</p>
           <p class="artwork-filename" id="artworkFileName" style="display:none;"></p>
+        </div>
+        <div class="form-field">
+          <label for="referenceMockup">Already have your own mockup or reference image? (optional)</label>
+          <input type="file" id="referenceMockup" accept="image/*">
+          <p class="graphite-text" style="font-size:12px; margin-top:8px;">If you've already put together a mockup elsewhere, upload it here — we'll show it directly instead of our own preview, and attach it to your order as reference.</p>
+          <p class="artwork-filename" id="referenceMockupFileName" style="display:none;"></p>
         </div>
         <div class="form-field">
           <label for="placement">Placement</label>
@@ -200,6 +217,8 @@
     uploadedArtworkUrl: null,  // real public URL once uploaded to storage (needed for Printful or order submission)
     localTextDesignUrl: null,  // local blob: URL for a text-only design, used by the real-photo compositor
     lastMockupBlobUrl: null,   // the currently-shown composited/Printful result, so we can revoke it before replacing
+    referenceMockupFile: null, // a customer-supplied, already-finished mockup image (bypasses our own preview entirely)
+    referenceMockupPreviewUrl: null, // local blob: URL for showing it immediately
   };
 
   // approximate print-area box per placement, in the garment SVG's own 300x320 coordinate space
@@ -343,11 +362,11 @@
     document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
     document.getElementById('previewPlacement').textContent = document.getElementById('placement').value;
     const qty = Number(document.getElementById('quantity').value) || 1;
-    document.getElementById('previewPrice').textContent = `$${(state.garment.price * qty).toFixed(2)}`;
+    document.getElementById('previewPrice').textContent = `₱${(state.garment.price * qty).toFixed(2)}`;
     updatePrintArea();
     // any change to garment/color/etc. invalidates a previously generated photo mockup
     const mockupResultEl = document.getElementById('mockupResult');
-    const garmentStageEl = document.querySelector('.garment-stage');
+    const garmentStageEl = document.getElementById('builtGarmentStage');
     if(mockupResultEl && mockupResultEl.style.display !== 'none'){
       mockupResultEl.style.display = 'none';
       garmentStageEl.style.display = '';
@@ -377,12 +396,54 @@
     scheduleAutoMockup();
   });
 
+  const ownMockupWrap = document.getElementById('ownMockupWrap');
+  const builtPreviewWrap = document.getElementById('builtPreviewWrap');
+  const ownMockupImg = document.getElementById('ownMockupImg');
+
+  function showOwnMockup(){
+    ownMockupWrap.style.display = 'block';
+    builtPreviewWrap.style.display = 'none';
+    document.getElementById('mockupCard').style.display = 'none';
+  }
+  function showBuiltPreview(){
+    ownMockupWrap.style.display = 'none';
+    builtPreviewWrap.style.display = 'block';
+    document.getElementById('mockupCard').style.display = '';
+  }
+
+  document.getElementById('referenceMockup').addEventListener('change', e => {
+    if(state.referenceMockupPreviewUrl) URL.revokeObjectURL(state.referenceMockupPreviewUrl);
+    const file = e.target.files[0] || null;
+    state.referenceMockupFile = file;
+    state.referenceMockupPreviewUrl = file ? URL.createObjectURL(file) : null;
+    const nameEl = document.getElementById('referenceMockupFileName');
+    if(file){
+      nameEl.style.display = 'block';
+      nameEl.textContent = `Selected: ${file.name}`;
+      ownMockupImg.src = state.referenceMockupPreviewUrl;
+      showOwnMockup();
+    }else{
+      nameEl.style.display = 'none';
+      nameEl.textContent = '';
+      showBuiltPreview();
+    }
+  });
+
+  document.getElementById('clearOwnMockupBtn').addEventListener('click', () => {
+    if(state.referenceMockupPreviewUrl) URL.revokeObjectURL(state.referenceMockupPreviewUrl);
+    state.referenceMockupFile = null;
+    state.referenceMockupPreviewUrl = null;
+    document.getElementById('referenceMockup').value = '';
+    document.getElementById('referenceMockupFileName').style.display = 'none';
+    showBuiltPreview();
+  });
+
   /* ---------------- photo-realistic mockup (Printful) ---------------- */
   const mockupBtn = document.getElementById('mockupBtn');
   const mockupStatus = document.getElementById('mockupStatus');
   const mockupResult = document.getElementById('mockupResult');
   const mockupImage = document.getElementById('mockupImage');
-  const garmentStage = document.querySelector('.garment-stage');
+  const garmentStage = document.getElementById('builtGarmentStage');
 
   let mockupGenerationId = 0;   // guards against a slow, stale request overwriting a newer one
   let mockupDebounceTimer = null;
@@ -529,6 +590,9 @@
 
     try{
       const artworkUrl = await ensureArtworkUploaded();
+      const referenceMockupUrl = state.referenceMockupFile
+        ? await ZgobStore.uploadArtwork(state.referenceMockupFile, `reference_${state.referenceMockupFile.name}`)
+        : null;
       const order = {
         name: fullName,
         email,
@@ -539,6 +603,7 @@
         placement: document.getElementById('placement').value,
         designText: document.getElementById('designText').value.trim(),
         artworkUrl,
+        referenceMockupUrl,
         notes: document.getElementById('notes').value.trim()
       };
       await ZgobStore.addOrder(order);
@@ -548,8 +613,13 @@
       state.artworkFile = null;
       state.uploadedArtworkUrl = null;
       if(state.artworkUrl){ URL.revokeObjectURL(state.artworkUrl); state.artworkUrl = null; }
-      const nameEl = document.getElementById('artworkFileName');
-      nameEl.style.display = 'none'; nameEl.textContent = '';
+      if(state.referenceMockupPreviewUrl){ URL.revokeObjectURL(state.referenceMockupPreviewUrl); state.referenceMockupPreviewUrl = null; }
+      state.referenceMockupFile = null;
+      document.getElementById('artworkFileName').style.display = 'none';
+      document.getElementById('artworkFileName').textContent = '';
+      document.getElementById('referenceMockupFileName').style.display = 'none';
+      document.getElementById('referenceMockupFileName').textContent = '';
+      showBuiltPreview();
       renderPreview();
       updateMockupButtonState();
       window.scrollTo({ top: 0, behavior: 'smooth' });

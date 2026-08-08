@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return `
         <tr>
           <td><strong>${zgobEscape(item.name)}</strong><div class="graphite-text" style="font-size:12px;">${zgobEscape(item.category)}</div></td>
-          <td>$${Number(item.price).toFixed(2)}</td>
+          <td>₱${Number(item.price).toFixed(2)}</td>
           ${sizeKeys.map(sz => `
             <td>
               <input type="number" min="0" value="${item.sizes[sz] ?? 0}" data-id="${item.id}" data-size="${sz}"
@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           : `<span class="graphite-text" style="font-size:11px;">Sketch only</span>`}</td>
         <td><strong>${zgobEscape(d.title)}</strong></td>
         <td>${zgobEscape(d.category)}</td>
-        <td>$${Number(d.price).toFixed(2)}</td>
+        <td>₱${Number(d.price).toFixed(2)}</td>
         <td>${d.artwork_url
           ? `<span class="status status-ok">Ready to use</span>`
           : `<span class="status status-low">None — text only</span>`}</td>
