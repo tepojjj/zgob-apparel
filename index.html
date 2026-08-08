@@ -271,13 +271,15 @@
   try{
     const featured = (await ZgobStore.getDesigns()).slice(0, 4);
     featuredEl.innerHTML = featured.map(d => `
-      <div class="card">
-        <div style="display:flex; gap:6px; margin-bottom:16px;">
-          ${d.swatch.map(hex => `<span style="width:16px;height:16px;border-radius:50%;background:${hex};display:inline-block;border:1px solid rgba(237,230,214,.3);"></span>`).join('')}
+      <div class="card" style="display:flex; flex-direction:column;">
+        <div style="background: var(--ink); border:1px solid var(--line); border-radius:2px; overflow:hidden; margin-bottom:16px; aspect-ratio:1; display:flex; align-items:center; justify-content:center;">
+          ${d.image_url
+            ? `<img src="${d.image_url}" alt="${d.title} on a real garment" loading="lazy" style="width:100%; height:100%; object-fit:cover;">`
+            : `<div style="padding:14px; width:100%;">${zgobGarmentSVG('Tee', d.swatch[d.swatch.length-1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0,10))}</div>`}
         </div>
-        <div class="tag" style="margin-bottom:10px;">${d.category}</div>
+        <div class="tag" style="margin-bottom:10px; align-self:flex-start;">${d.category}</div>
         <h3>${d.title}</h3>
-        <p class="graphite-text" style="font-size:14px;">${d.colorway}</p>
+        <p class="graphite-text" style="font-size:14px; flex:1;">${d.colorway}</p>
         <p class="tag-card-price" style="font-family:'Space Mono',monospace; font-weight:700;">$${d.price}</p>
       </div>
     `).join('');
