@@ -203,6 +203,7 @@
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
 <script src="js/garments.js"></script>
+<script src="js/garment-photos.js"></script>
 <script src="js/main.js"></script>
 <script>
 (async () => {
@@ -224,15 +225,21 @@
 
   function renderHeroPreview(){
     const stage = document.getElementById('heroGarment');
+    const garmentName = heroState.type === 'Long Sleeve' ? 'Long Sleeve Tee' : (heroState.type === 'Tee' ? 'Classic Tee' : heroState.type === 'Hoodie' ? 'Heavyweight Hoodie' : 'Crewneck Sweatshirt');
+    const realPhoto = (typeof zgobFindGarmentPhoto === 'function') ? zgobFindGarmentPhoto(garmentName, heroState.color.name) : null;
+
     stage.style.opacity = '0';
     setTimeout(() => {
-      stage.innerHTML = zgobGarmentSVG(heroState.type, heroState.color.hex);
-      const label = document.getElementById('print-label');
-      if(label) label.textContent = 'ZGOB';
+      if(realPhoto){
+        stage.innerHTML = `<img src="${realPhoto.photoUrl}" alt="${garmentName} in ${heroState.color.name}" style="width:100%; height:100%; object-fit:contain;">`;
+      }else{
+        stage.innerHTML = zgobGarmentSVG(heroState.type, heroState.color.hex);
+        const label = document.getElementById('print-label');
+        if(label) label.textContent = 'ZGOB';
+      }
       stage.style.opacity = '1';
     }, 90);
-    document.getElementById('stagePreviewName').textContent =
-      heroState.type === 'Long Sleeve' ? 'Long Sleeve Tee' : (heroState.type === 'Tee' ? 'Classic Tee' : heroState.type === 'Hoodie' ? 'Heavyweight Hoodie' : 'Crewneck Sweatshirt');
+    document.getElementById('stagePreviewName').textContent = garmentName;
     document.getElementById('stagePreviewColor').textContent = heroState.color.name;
   }
 
