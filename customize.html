@@ -46,12 +46,17 @@
           <button type="button" id="clearOwnMockupBtn" class="btn btn-small" style="margin-top:12px; width:100%;">Use our live preview instead →</button>
         </div>
         <div id="builtPreviewWrap">
-        <div class="garment-stage" id="builtGarmentStage" style="min-height:420px; position:relative;">
+        <div class="garment-stage" id="builtGarmentStage" style="min-height:420px; position:relative; display:flex; align-items:center; justify-content:center; padding:14px;">
           <span class="crosshair tl"></span><span class="crosshair tr"></span>
           <span class="crosshair bl"></span><span class="crosshair br"></span>
-          <span class="tag" id="sketchBadge" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:2;">Sketch guide — not a real photo</span>
-          <div id="previewGarment"></div>
+          <span class="tag" id="previewBadge" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:2;">Photo-realistic preview</span>
+          <img id="mockupImage" alt="Photo-realistic mockup" style="max-width:100%; max-height:100%; border-radius:2px; display:none;">
+          <div id="previewGarment" style="display:none;"></div>
+          <div id="previewLoadingOverlay" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; background:rgba(20,18,13,0.35); z-index:3; border-radius:2px;">
+            <span class="graphite-text" style="background:var(--paper,#fff); padding:8px 14px; border-radius:2px; font-size:12px;">Rendering real preview…</span>
+          </div>
         </div>
+        <p id="mockupFallbackNote" class="graphite-text" style="font-size:12px; margin-top:8px; display:none;"></p>
         <div class="card" style="margin-top:20px;">
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">GARMENT</span>
@@ -71,22 +76,6 @@
           </div>
           <div class="print-area-hint is-empty" id="printAreaHint">
             <span class="dot"></span><span id="printAreaHintText">No design yet — add text or upload artwork below</span>
-          </div>
-        </div>
-
-        <div class="card" id="mockupCard" style="margin-top:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px;">
-            <div>
-              <h3 style="font-size:15px; margin:0;">Photo-realistic preview</h3>
-              <p class="graphite-text" style="font-size:12px; margin:4px 0 0;">Renders your design on a real product photo — instantly if we've calibrated this garment/colour, otherwise via Printful.</p>
-            </div>
-          </div>
-          <button type="button" id="mockupBtn" class="btn btn-block" disabled>Generate photo-realistic preview →</button>
-          <p class="graphite-text" style="font-size:11px; margin-top:8px;">Regenerates automatically about a second after you change your design, garment, colour, size, or placement.</p>
-          <p id="mockupStatus" class="graphite-text" style="font-size:12px; margin-top:10px; display:none;"></p>
-          <div id="mockupResult" style="display:none; margin-top:16px;">
-            <img id="mockupImage" alt="Photo-realistic mockup" style="width:100%; border-radius:2px; border:1px solid var(--line);">
-            <button type="button" id="mockupClearBtn" class="btn btn-small" style="margin-top:10px;">Back to sketch view</button>
           </div>
         </div>
         </div>
@@ -289,7 +278,7 @@
     el.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
       state.garment = GARMENTS.find(g => g.id === btn.dataset.id);
       leaveDesignPhotoMode();
-      renderGarmentPicker(); renderPreview(); scheduleAutoMockup();
+      renderGarmentPicker(); renderPreview();
     }));
   }
 
@@ -299,7 +288,7 @@
     el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
       state.color = COLORS.find(c => c.name === btn.dataset.name);
       leaveDesignPhotoMode();
-      renderColorPicker(); renderPreview(); scheduleAutoMockup();
+      renderColorPicker(); renderPreview();
     }));
   }
 
@@ -367,39 +356,79 @@
     }
   }
 
+  const mockupImageEl = document.getElementById('mockupImage');
+  const previewBadgeEl = document.getElementById('previewBadge');
+  const previewLoadingOverlay = document.getElementById('previewLoadingOverlay');
+  const mockupFallbackNote = document.getElementById('mockupFallbackNote');
+
+  /** Swap the stage to a real photo (calibrated blank photo, a composited mockup, a Printful render, or a house design's own photo). */
+  function showRealPhoto(url, label){
+    mockupImageEl.src = url;
+    mockupImageEl.style.display = '';
+    document.getElementById('previewGarment').style.display = 'none';
+    previewBadgeEl.textContent = label || 'Photo-realistic preview';
+    previewLoadingOverlay.style.display = 'none';
+  }
+
+  /** Fall back to the cartoon sketch — only used when no real photo can be shown yet. */
+  function showSketch(note){
+    mockupImageEl.style.display = 'none';
+    document.getElementById('previewGarment').style.display = '';
+    previewBadgeEl.textContent = 'Sketch guide — not a real photo';
+    previewLoadingOverlay.style.display = 'none';
+    if(note){
+      const hasDesign = !!(state.artworkUrl || state.text.trim());
+      mockupFallbackNote.innerHTML = zgobEscape(note) + (hasDesign ? ' <a href="#" class="retry-link" style="text-decoration:underline; font-weight:600;">Try again</a>' : '');
+      mockupFallbackNote.style.display = 'block';
+    }else{
+      mockupFallbackNote.style.display = 'none';
+    }
+  }
+
+  function setPreviewLoading(msg){
+    previewBadgeEl.textContent = msg || 'Rendering real preview…';
+    previewLoadingOverlay.style.display = 'flex';
+  }
+
   function renderPreview(){
-    const previewEl = document.getElementById('previewGarment');
-    const sketchBadge = document.getElementById('sketchBadge');
     const hint = document.getElementById('printAreaHint');
 
-    if(state.useDesignPhoto && state.designPhotoUrl){
-      previewEl.style.cssText = 'width:100%; height:100%; display:flex; align-items:center; justify-content:center;';
-      previewEl.innerHTML = `<img src="${state.designPhotoUrl}" alt="${zgobEscape(state.garment.name)}" style="max-width:100%; max-height:100%; border-radius:2px;">`;
-      sketchBadge.style.display = 'none';
-      hint.style.display = 'none';
-      document.getElementById('mockupCard').style.display = 'none';
-    }else{
-      previewEl.style.cssText = '';
-      const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
-      previewEl.innerHTML = zgobGarmentSVG(svgType, state.color.hex);
-      sketchBadge.style.display = '';
-      hint.style.display = '';
-      document.getElementById('mockupCard').style.display = '';
-      updatePrintArea();
-    }
+    // keep the underlying sketch SVG in sync regardless of whether it's the one shown —
+    // it still drives the print-area hint text and stands in as the fallback visual.
+    const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
+    document.getElementById('previewGarment').innerHTML = zgobGarmentSVG(svgType, state.color.hex);
+    updatePrintArea();
 
     document.getElementById('previewGarmentName').textContent = state.garment.name;
     document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
     document.getElementById('previewPlacement').textContent = document.getElementById('placement').value;
     const qty = Number(document.getElementById('quantity').value) || 1;
     document.getElementById('previewPrice').textContent = `₱${(state.garment.price * qty).toFixed(2)}`;
-    // any change to garment/color/etc. invalidates a previously generated photo mockup
-    const mockupResultEl = document.getElementById('mockupResult');
-    const garmentStageEl = document.getElementById('builtGarmentStage');
-    if(mockupResultEl && mockupResultEl.style.display !== 'none'){
-      mockupResultEl.style.display = 'none';
-      garmentStageEl.style.display = '';
+
+    // any change invalidates whatever real photo was showing before
+    if(state.lastMockupBlobUrl){ URL.revokeObjectURL(state.lastMockupBlobUrl); state.lastMockupBlobUrl = null; }
+    mockupGenerationId++; // invalidate any in-flight generation from before this change
+
+    if(state.useDesignPhoto && state.designPhotoUrl){
+      showRealPhoto(state.designPhotoUrl, 'Photo-realistic preview');
+      hint.style.display = 'none';
+      return;
     }
+    hint.style.display = '';
+
+    const hasDesign = !!(state.artworkUrl || state.text.trim());
+    const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.color.name);
+
+    if(!hasDesign){
+      // nothing to composite yet — if we have a real blank photo for this garment/colour, show that instead of the cartoon
+      if(photoConfig) showRealPhoto(photoConfig.photoUrl, 'Photo-realistic preview');
+      else showSketch('No real photo on file for this garment/colour yet — showing a rough guide instead.');
+      return;
+    }
+
+    // there's a design — always try for a real photo mockup; only land on the sketch if that genuinely fails
+    setPreviewLoading(photoConfig ? 'Rendering on the photo…' : 'Checking for a photo mockup…');
+    scheduleAutoMockup();
   }
 
   /** Any direct customization action means the shopper is no longer just looking at the design's
@@ -414,12 +443,10 @@
     state.text = e.target.value;
     leaveDesignPhotoMode();
     renderPreview();
-    updateMockupButtonState();
-    scheduleAutoMockup();
   });
-  document.getElementById('size').addEventListener('change', () => { renderPreview(); scheduleAutoMockup(); });
+  document.getElementById('size').addEventListener('change', renderPreview);
   document.getElementById('quantity').addEventListener('input', renderPreview);
-  document.getElementById('placement').addEventListener('change', () => { leaveDesignPhotoMode(); renderPreview(); scheduleAutoMockup(); });
+  document.getElementById('placement').addEventListener('change', () => { leaveDesignPhotoMode(); renderPreview(); });
   document.getElementById('artwork').addEventListener('change', e => {
     if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
     const file = e.target.files[0] || null;
@@ -431,8 +458,6 @@
     if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Selected: ${file.name}`; }
     else{ nameEl.style.display = 'none'; nameEl.textContent = ''; }
     renderPreview();
-    updateMockupButtonState();
-    scheduleAutoMockup();
   });
 
   const ownMockupWrap = document.getElementById('ownMockupWrap');
@@ -442,12 +467,10 @@
   function showOwnMockup(){
     ownMockupWrap.style.display = 'block';
     builtPreviewWrap.style.display = 'none';
-    document.getElementById('mockupCard').style.display = 'none';
   }
   function showBuiltPreview(){
     ownMockupWrap.style.display = 'none';
     builtPreviewWrap.style.display = 'block';
-    document.getElementById('mockupCard').style.display = '';
   }
 
   document.getElementById('referenceMockup').addEventListener('change', e => {
@@ -477,21 +500,9 @@
     showBuiltPreview();
   });
 
-  /* ---------------- photo-realistic mockup (Printful) ---------------- */
-  const mockupBtn = document.getElementById('mockupBtn');
-  const mockupStatus = document.getElementById('mockupStatus');
-  const mockupResult = document.getElementById('mockupResult');
-  const mockupImage = document.getElementById('mockupImage');
-  const garmentStage = document.getElementById('builtGarmentStage');
-
+  /* ---------------- photo-realistic mockup (calibrated compositor + Printful fallback) ---------------- */
   let mockupGenerationId = 0;   // guards against a slow, stale request overwriting a newer one
   let mockupDebounceTimer = null;
-
-  function updateMockupButtonState(){
-    const hasDesign = !!(state.artworkUrl || state.text.trim());
-    mockupBtn.disabled = !hasDesign;
-  }
-  updateMockupButtonState();
 
   async function ensureArtworkUploaded(){
     if(state.uploadedArtworkUrl) return state.uploadedArtworkUrl;
@@ -514,25 +525,18 @@
     return state.localTextDesignUrl;
   }
 
-  function setMockupStatus(msg){
-    mockupStatus.style.display = msg ? 'block' : 'none';
-    mockupStatus.textContent = msg || '';
-  }
-
-  /** Shared by the manual button and the auto-trigger. Ignores its own result if a newer run has started.
-      Priority: a calibrated real photo (instant, fully local) > Printful (needs an uploaded image + network round trip) > nothing. */
+  /** The real-mockup pipeline. Ignores its own result if a newer run has started (garment/colour/design
+      changed again in the meantime). Priority: a calibrated real photo (instant, fully local) > Printful
+      (needs an uploaded image + network round trip) > sketch, only as a last resort. */
   async function runMockupGeneration(){
     if(!(state.artworkUrl || state.text.trim())) return;
     const myId = ++mockupGenerationId;
 
     const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.color.name);
 
-    mockupBtn.disabled = true;
-    setMockupStatus('');
-
     try{
       if(photoConfig && photoConfig.quad){
-        mockupBtn.textContent = 'Rendering on the photo…';
+        setPreviewLoading('Rendering on the photo…');
         const localDesignUrl = await getLocalDesignPreviewUrl();
         if(myId !== mockupGenerationId) return;
 
@@ -547,17 +551,14 @@
         if(myId !== mockupGenerationId) return;
         if(state.lastMockupBlobUrl) URL.revokeObjectURL(state.lastMockupBlobUrl);
         state.lastMockupBlobUrl = URL.createObjectURL(blob);
-        mockupImage.src = state.lastMockupBlobUrl;
-        mockupResult.style.display = 'block';
-        garmentStage.style.display = 'none';
-        setMockupStatus('');
+        showRealPhoto(state.lastMockupBlobUrl, 'Photo-realistic preview');
       }else{
         // no calibrated photo for this garment/colour yet — try Printful as a fallback, if it's mapped
-        mockupBtn.textContent = 'Uploading design…';
+        setPreviewLoading('Uploading design…');
         const imageUrl = await ensureArtworkUploaded();
         if(myId !== mockupGenerationId) return;
 
-        mockupBtn.textContent = 'Starting mockup…';
+        setPreviewLoading('Starting mockup…');
         const mockupUrl = await ZgobMockup.generate({
           garment: state.garment.name,
           color: state.color.name,
@@ -566,56 +567,38 @@
           imageUrl
         }, (status) => {
           if(myId !== mockupGenerationId) return;
-          mockupBtn.textContent = status === 'pending' ? 'Rendering on the garment…' : `Status: ${status}…`;
+          setPreviewLoading(status === 'pending' ? 'Rendering on the garment…' : `Status: ${status}…`);
         });
 
         if(myId !== mockupGenerationId) return;
-        mockupImage.src = mockupUrl;
-        mockupResult.style.display = 'block';
-        garmentStage.style.display = 'none';
-        setMockupStatus('');
+        showRealPhoto(mockupUrl, 'Photo-realistic preview');
       }
     }catch(err){
       if(myId !== mockupGenerationId) return;
-      // fail quietly into the sketch view rather than blocking the page — the sketch already
-      // reflects the current design, so a failed photo attempt shouldn't feel like a dead end
-      setMockupStatus(err.message || 'No photo-realistic preview available for this garment/colour yet.');
+      // only now, having actually tried, fall back to the sketch — with a retry link and the reason why
+      showSketch(err.message || 'No photo-realistic preview available for this garment/colour yet.');
       console.error(err);
-    }finally{
-      if(myId === mockupGenerationId){
-        mockupBtn.disabled = false;
-        mockupBtn.textContent = 'Regenerate photo-realistic preview →';
-        updateMockupButtonState();
-      }
     }
   }
 
   /** Called after any change to garment/colour/size/placement/design. Auto-generates ~1s after things settle. */
   function scheduleAutoMockup(){
     clearTimeout(mockupDebounceTimer);
-    mockupGenerationId++; // invalidate any in-flight run so its result won't land after this edit
-    if(!(state.artworkUrl || state.text.trim())){
-      setMockupStatus('');
-      return;
-    }
+    if(!(state.artworkUrl || state.text.trim())) return;
     mockupDebounceTimer = setTimeout(runMockupGeneration, 1000);
   }
 
-  mockupBtn.addEventListener('click', () => {
-    clearTimeout(mockupDebounceTimer);
-    runMockupGeneration();
-  });
-
-  document.getElementById('mockupClearBtn').addEventListener('click', () => {
-    mockupResult.style.display = 'none';
-    garmentStage.style.display = '';
-    setMockupStatus('');
+  mockupFallbackNote.addEventListener('click', e => {
+    if(e.target.closest('.retry-link')){
+      e.preventDefault();
+      clearTimeout(mockupDebounceTimer);
+      runMockupGeneration();
+    }
   });
 
   renderGarmentPicker();
   renderColorPicker();
   renderPreview();
-  if(state.artworkUrl && !state.useDesignPhoto) scheduleAutoMockup(); // a design was preloaded with real artwork — go straight to the photo-realistic preview
 
   formEl.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -660,7 +643,6 @@
       document.getElementById('referenceMockupFileName').textContent = '';
       showBuiltPreview();
       renderPreview();
-      updateMockupButtonState();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }catch(err){
       zgobToast('Something went wrong sending your order — please try again.');
