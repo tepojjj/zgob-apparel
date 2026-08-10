@@ -17,7 +17,7 @@ create table if not exists public.designs (
   price       numeric not null default 0,
   tags        text[] not null default '{}',
   swatch      text[] not null default '{}',
-  image_url    text,  -- real photo of the finished garment/design, shown on the Designs page in place of the SVG sketch
+  image_url    text,  -- real photo of the finished garment/design, shown on the Designs page (a plain placeholder shows if this is empty)
   artwork_url  text,  -- the actual print-ready file (transparent PNG/SVG); applied to Customize when a shopper clicks "Use this design"
   created_at  timestamptz not null default now()
 );
@@ -217,6 +217,9 @@ insert into public.inventory (id, name, category, price, sizes) values
   ('inv_03','Long Sleeve Tee','Long Sleeve',30,'{"S":20,"M":28,"L":22,"XL":9,"XXL":0}'),
   ('inv_04','Crewneck Sweatshirt','Crewneck',46,'{"S":18,"M":26,"L":24,"XL":11,"XXL":5}'),
   ('inv_05','Cropped Tee','Tee',26,'{"S":15,"M":19,"L":8,"XL":2,"XXL":0}'),
-  ('inv_06','Tank Top','Tank',22,'{"S":24,"M":30,"L":20,"XL":7,"XXL":0}')
+  ('inv_06','Tank Top','Tank',22,'{"S":24,"M":30,"L":20,"XL":7,"XXL":0}'),
+  ('inv_07','Basketball Jersey','Basketball Jersey',38,'{"S":0,"M":0,"L":0,"XL":0,"XXL":0}'),
+  ('inv_08','Volleyball Jersey','Volleyball Jersey',38,'{"S":0,"M":0,"L":0,"XL":0,"XXL":0}'),
+  ('inv_09','Polo Shirt','Polo',32,'{"S":0,"M":0,"L":0,"XL":0,"XXL":0}')
 on conflict (id) do update set
   name = excluded.name, category = excluded.category, price = excluded.price, sizes = excluded.sizes;

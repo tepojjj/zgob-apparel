@@ -1,11 +1,10 @@
 /* =========================================================
-   ZGOB APPAREL — mockup client helper
-   Talks to /api/mockup-create + /api/mockup-status (Printful
-   Mockup Generator, proxied server-side so the API key never
-   reaches the browser).
+   ZGOB APPAREL — text-to-image helper for the mockup pipeline
+   Renders a typed design as a PNG so text-only designs can be
+   uploaded/composited the same way uploaded artwork is.
    ========================================================= */
 
-/** Render plain text onto a transparent PNG so text-only designs can still be sent to Printful. */
+/** Render plain text onto a transparent PNG so text-only designs can be composited the same way uploaded artwork is. */
 function zgobTextToImageBlob(text, { width = 800, height = 800 } = {}){
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
@@ -38,29 +37,5 @@ function zgobTextToImageBlob(text, { width = 800, height = 800 } = {}){
 }
 
 const ZgobMockup = {
-  textToImageBlob: zgobTextToImageBlob,
-
-  /** POST /api/mockup-create, then poll /api/mockup-status until done. onStatus(status) fires on each poll. */
-  async generate({ garment, color, size, placement, imageUrl }, onStatus){
-    const createRes = await fetch('/api/mockup-create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ garment, color, size, placement, imageUrl })
-    });
-    const created = await createRes.json();
-    if(!createRes.ok) throw new Error(created.error || 'Could not start mockup generation.');
-
-    const taskKey = created.taskKey;
-    const maxAttempts = 20;
-    for(let attempt = 0; attempt < maxAttempts; attempt++){
-      await new Promise(r => setTimeout(r, 1500));
-      const statusRes = await fetch(`/api/mockup-status?taskKey=${encodeURIComponent(taskKey)}`);
-      const statusData = await statusRes.json();
-      if(!statusRes.ok) throw new Error(statusData.error || 'Could not check mockup status.');
-      onStatus && onStatus(statusData.status);
-      if(statusData.status === 'completed' && statusData.mockupUrl) return statusData.mockupUrl;
-      if(statusData.status === 'failed') throw new Error('Printful could not generate this mockup.');
-    }
-    throw new Error('Mockup generation timed out — please try again.');
-  }
+  textToImageBlob: zgobTextToImageBlob
 };

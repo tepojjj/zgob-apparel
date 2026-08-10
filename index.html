@@ -221,7 +221,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
-<script src="js/garments.js"></script>
 <script src="js/garment-photos.js"></script>
 <script src="js/main.js"></script>
 <script>
@@ -254,9 +253,7 @@
       if(realPhoto){
         stage.innerHTML = `<img src="${realPhoto.photoUrl}" alt="${garmentName} in ${heroState.color.name}" style="width:100%; height:100%; object-fit:contain;">`;
       }else{
-        stage.innerHTML = zgobGarmentSVG(heroState.type, heroState.color.hex);
-        const label = document.getElementById('print-label');
-        if(label) label.textContent = 'ZGOB';
+        stage.innerHTML = zgobPhotoPlaceholder(garmentName, `${heroState.color.name} — photo coming soon`);
       }
       stage.style.opacity = '1';
     }, 90);
@@ -304,7 +301,7 @@
         <div style="background: var(--ink); border:1px solid var(--line); border-radius:2px; overflow:hidden; margin-bottom:16px; aspect-ratio:1; display:flex; align-items:center; justify-content:center;">
           ${d.image_url
             ? `<img src="${d.image_url}" alt="${zgobEscape(d.title)} on a real garment" loading="lazy" style="width:100%; height:100%; object-fit:cover;">`
-            : `<div style="padding:14px; width:100%;">${zgobGarmentSVG('Tee', d.swatch[d.swatch.length-1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0,10))}</div>`}
+            : zgobPhotoPlaceholder(d.title)}
         </div>
         <div class="tag" style="margin-bottom:10px; align-self:flex-start;">${zgobEscape(d.category)}</div>
         <h3>${zgobEscape(d.title)}</h3>
@@ -334,7 +331,7 @@
     if(!d) return;
     modalMedia.innerHTML = d.image_url
       ? `<img src="${d.image_url}" alt="${zgobEscape(d.title)} on a real garment">`
-      : zgobGarmentSVG('Tee', d.swatch[d.swatch.length - 1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0, 10));
+      : zgobPhotoPlaceholder(d.title);
     if(d.tags && d.tags.length){
       modalTag.style.display = 'inline-block';
       modalTag.textContent = d.tags[0];

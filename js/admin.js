@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <tr>
         <td>${d.image_url
           ? `<img src="${d.image_url}" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:2px; border:1px solid var(--line);">`
-          : `<span class="graphite-text" style="font-size:11px;">Sketch only</span>`}</td>
+          : `<span class="graphite-text" style="font-size:11px;">No photo</span>`}</td>
         <td><strong>${zgobEscape(d.title)}</strong></td>
         <td>${zgobEscape(d.category)}</td>
         <td>₱${Number(d.price).toFixed(2)}</td>

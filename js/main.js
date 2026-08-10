@@ -42,3 +42,15 @@ function zgobEscape(str){
   div.textContent = str;
   return div.innerHTML;
 }
+
+/** Plain placeholder shown wherever a real garment/design photo hasn't been added yet
+    (Admin → Garment reference photos, or a design's own photo). Deliberately blank/neutral —
+    not a drawn mockup — so nobody mistakes it for what the actual product looks like. */
+function zgobPhotoPlaceholder(label, sublabel){
+  return `
+    <div style="width:100%; height:100%; min-height:160px; display:flex; flex-direction:column;
+                align-items:center; justify-content:center; gap:6px; background:#fff; border-radius:2px; padding:20px; box-sizing:border-box;">
+      <span style="font-family:'Space Mono',monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#8a8a8a;">${zgobEscape(label || 'Photo coming soon')}</span>
+      ${sublabel ? `<span style="font-size:12px; color:#b0b0b0; text-align:center;">${zgobEscape(sublabel)}</span>` : ''}
+    </div>`;
+}
