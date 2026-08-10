@@ -261,7 +261,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           : `<span class="graphite-text" style="font-size:11px;">Sketch only</span>`}</td>
         <td><strong>${zgobEscape(d.title)}</strong></td>
         <td>${zgobEscape(d.category)}</td>
-        <td>₱${Number(d.price).toFixed(2)}</td>
+        <td>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="number" min="0" step="0.01" class="design-price-input" data-id="${d.id}" value="${d.price}"
+              style="width:80px; padding:6px 8px; font-family:'Space Mono',monospace; font-size:13px;
+              background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px;">
+            <button class="icon-btn save-design-price" data-id="${d.id}">Save price</button>
+          </div>
+        </td>
         <td>${d.artwork_url
           ? `<span class="status status-ok">Ready to use</span>`
           : `<span class="status status-low">None — text only</span>`}</td>
@@ -310,6 +317,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(confirm('Delete this design? This cannot be undone.')){
           await ZgobStore.deleteDesign(btn.dataset.id);
           renderAll();
+        }
+      });
+    });
+    body.querySelectorAll('.save-design-price').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const input = body.querySelector(`.design-price-input[data-id="${btn.dataset.id}"]`);
+        const price = Number(input.value);
+        if(!(price >= 0)){
+          zgobToast('Enter a valid price.');
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+        try{
+          await ZgobStore.updateDesignPrice(btn.dataset.id, price);
+          const d = designsCache.find(x => x.id === btn.dataset.id);
+          if(d) d.price = price;
+          btn.textContent = 'Saved ✓';
+          setTimeout(() => { btn.textContent = 'Save price'; btn.disabled = false; }, 1200);
+        }catch(err){
+          btn.textContent = 'Save price';
+          btn.disabled = false;
+          zgobToast('Could not save that price: ' + err.message);
+          console.error(err);
         }
       });
     });

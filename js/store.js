@@ -59,6 +59,10 @@ const ZgobStore = (() => {
     async deleteDesign(id){
       orThrow(await client.from('designs').delete().eq('id', id));
     },
+    /** Update just the price on a design row — used by the inline price editor in the admin designs table. */
+    async updateDesignPrice(id, price){
+      return orThrow(await client.from('designs').update({ price: Number(price) || 0 }).eq('id', id).select().single());
+    },
 
     /* ---------------- inventory ---------------- */
     async getInventory(){
