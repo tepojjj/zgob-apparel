@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Available Designs — Zgob Apparel</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="images/favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 </head>
 <body>
 
 <header class="site-header">
   <nav class="nav">
-    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <a href="index.html" class="logo"><img src="images/logo-nav.png" alt="Zgob Apparel"></a>
     <ul class="nav-links">
       <li><a href="index.html">Overview</a></li>
       <li><a href="designs.html">Designs</a></li>
@@ -81,6 +84,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
+<script src="js/garments.js"></script>
 <script src="js/main.js"></script>
 <script>
 (async () => {
@@ -119,7 +123,7 @@
         <div class="design-thumb" data-id="${d.id}" style="cursor:pointer; background: var(--ink); border:1px solid var(--line); border-radius:2px; overflow:hidden; margin-bottom:16px; aspect-ratio:1; display:flex; align-items:center; justify-content:center;">
           ${d.image_url
             ? `<img src="${d.image_url}" alt="${d.title} on a real garment" loading="lazy" style="width:100%; height:100%; object-fit:cover;">`
-            : zgobPhotoPlaceholder(d.title)}
+            : `<div style="padding:14px; width:100%;">${zgobGarmentSVG('Tee', d.swatch[d.swatch.length-1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0,10))}</div>`}
         </div>
         ${d.tags.length ? `<div class="tag" style="align-self:flex-start; margin-bottom:10px; color:var(--thread); border-color:var(--thread);">${d.tags[0]}</div>` : ''}
         <h3 class="design-thumb" data-id="${d.id}" style="cursor:pointer;">${d.title}</h3>
@@ -150,7 +154,7 @@
     if(!d) return;
     modalMedia.innerHTML = d.image_url
       ? `<img src="${d.image_url}" alt="${d.title} on a real garment">`
-      : zgobPhotoPlaceholder(d.title);
+      : zgobGarmentSVG('Tee', d.swatch[d.swatch.length - 1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0, 10));
     if(d.tags.length){
       modalTag.style.display = 'inline-block';
       modalTag.textContent = d.tags[0];

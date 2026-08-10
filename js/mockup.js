@@ -1,10 +1,13 @@
 /* =========================================================
-   ZGOB APPAREL — text-to-image helper for the mockup pipeline
-   Renders a typed design as a PNG so text-only designs can be
-   uploaded/composited the same way uploaded artwork is.
+   ZGOB APPAREL — text-design helper
+   Renders plain text onto a transparent PNG so text-only
+   designs can be warped onto a real garment photo by
+   js/compositor.js, the same as an uploaded artwork file.
+   (No third-party mockup service is used — every real-photo
+   preview is generated locally from your own reference photos,
+   calibrated at /calibrate.html.)
    ========================================================= */
 
-/** Render plain text onto a transparent PNG so text-only designs can be composited the same way uploaded artwork is. */
 function zgobTextToImageBlob(text, { width = 800, height = 800 } = {}){
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');

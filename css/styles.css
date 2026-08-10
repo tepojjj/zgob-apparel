@@ -163,14 +163,10 @@ p{ margin: 0 0 1em 0; }
   color: var(--canvas);
   display:flex; align-items:center; gap:10px;
 }
-.logo .stamp-mark{
-  width: 30px; height:30px;
-  border: 2px solid var(--thread);
-  border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  color: var(--thread);
-  font-size: 13px;
-  transform: rotate(-8deg);
+.logo img{
+  height: 40px;
+  width: auto;
+  display:block;
 }
 .nav-links{
   display:flex; gap: 6px;

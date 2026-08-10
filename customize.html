@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Customize — Zgob Apparel</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="images/favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 </head>
 <body>
 
 <header class="site-header">
   <nav class="nav">
-    <a href="index.html" class="logo"><span class="stamp-mark">Z</span> ZGOB APPAREL</a>
+    <a href="index.html" class="logo"><img src="images/logo-nav.png" alt="Zgob Apparel"></a>
     <ul class="nav-links">
       <li><a href="index.html">Overview</a></li>
       <li><a href="designs.html">Designs</a></li>
@@ -57,14 +60,15 @@
           </div>
         </div>
         <p id="mockupFallbackNote" class="graphite-text" style="font-size:12px; margin-top:8px; display:none;"></p>
+        <div id="photoThumbStrip" style="display:none; gap:8px; margin-top:12px; flex-wrap:wrap;"></div>
         <div class="card" style="margin-top:20px;">
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">GARMENT</span>
             <strong id="previewGarmentName">Classic Tee</strong>
           </div>
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">COLOUR / SIZE</span>
-            <strong id="previewColorSize">Canvas / M</strong>
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">SIZE</span>
+            <strong id="previewSize">M</strong>
           </div>
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">PLACEMENT</span>
@@ -88,10 +92,7 @@
         <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">01 · Garment</h3>
         <div class="chip-group" id="garmentPicker" style="margin:14px 0 26px;"></div>
 
-        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">02 · Colour</h3>
-        <div class="swatch-picker" id="colorPicker" style="margin:14px 0 26px;"></div>
-
-        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">03 · Size &amp; quantity</h3>
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">02 · Size &amp; quantity</h3>
         <div class="form-row" style="margin-bottom:26px;">
           <div class="form-field" style="margin-bottom:0;">
             <label for="size">Size</label>
@@ -105,7 +106,7 @@
           </div>
         </div>
 
-        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">04 · Your design</h3>
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">03 · Your design</h3>
         <div class="form-field">
           <label for="designText">Text on garment (optional)</label>
           <input type="text" id="designText" placeholder="e.g. ZGOB RUN CLUB" maxlength="24">
@@ -171,6 +172,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
+<script src="js/garments.js"></script>
 <script src="js/compositor.js"></script>
 <script src="js/garment-photos.js"></script>
 <script src="js/mockup.js"></script>
@@ -187,20 +189,18 @@
     return;
   }
   if(typeof zgobLoadGarmentPhotos === 'function') await zgobLoadGarmentPhotos();
-  const COLORS = [
-    { name:'Canvas', hex:'#ede6d6' },
-    { name:'Ink', hex:'#14120d' },
-    { name:'Denim', hex:'#3e5c74' },
-    { name:'Thread Red', hex:'#d6432a' },
-    { name:'Mustard', hex:'#d4a017' },
-    { name:'Chalk', hex:'#f7f3e8' },
-  ];
+
+  // garments only come in plain white for now — no fabric-colour picker on this page.
+  // Kept as an object (not just a string) so the sketch-tint code and order-submission
+  // code that expect `state.color.name` / `state.color.hex` don't need to change.
+  const DEFAULT_COLOR = { name: 'White', hex: '#f7f3e8' };
 
   let state = {
     garment: GARMENTS[0],
-    color: COLORS[0],
+    color: DEFAULT_COLOR,
+    photoIndex: 0,          // which reference photo (of possibly several) is active for the current garment
     text: '',
-    artworkUrl: null,      // local blob: URL for the uploaded artwork, fed into the real-photo compositor
+    artworkUrl: null,      // local blob: URL, used only for the instant SVG sketch preview
     artworkFile: null,     // the actual File, if one was chosen
     uploadedArtworkUrl: null,  // real public URL once uploaded to storage (needed for order submission)
     localTextDesignUrl: null,  // local blob: URL for a text-only design, used by the real-photo compositor
@@ -211,17 +211,20 @@
     useDesignPhoto: false,  // true right after picking a design with a photo — cleared the moment they customize anything
   };
 
+  // approximate print-area box per placement, in the garment SVG's own 300x320 coordinate space
+  const PLACEMENT_BOXES = {
+    'Front, centered': { x:100, y:110, w:100, h:100 },
+    'Left chest':       { x:150, y:86,  w:44,  h:40  },
+    'Back, full':       { x:72,  y:86,  w:156, h:150 },
+    'Sleeve':            { x:214, y:78,  w:42,  h:42  },
+  };
+
   // pre-fill from the hero's live preview (index.html) or a "Use this design" link (designs.html)
   const params = new URLSearchParams(location.search);
   const heroGarmentType = params.get('garment');
-  const heroColorName = params.get('color');
   if(heroGarmentType){
     const match = GARMENTS.find(g => (g.category === heroGarmentType) || (heroGarmentType === 'Long Sleeve' && g.category === 'Long Sleeve'));
     if(match) state.garment = match;
-  }
-  if(heroColorName){
-    const colorMatch = COLORS.find(c => c.name.toLowerCase() === heroColorName.toLowerCase());
-    if(colorMatch) state.color = colorMatch;
   }
   const designParam = params.get('design');
   if(designParam){
@@ -268,37 +271,73 @@
     el.innerHTML = GARMENTS.map(g => `<button type="button" class="chip ${g.id===state.garment.id?'selected':''}" data-id="${g.id}">${g.name}</button>`).join('');
     el.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
       state.garment = GARMENTS.find(g => g.id === btn.dataset.id);
+      state.photoIndex = 0; // reset to the first reference photo for the newly picked garment
       leaveDesignPhotoMode();
       renderGarmentPicker(); renderPreview();
     }));
   }
 
-  function renderColorPicker(){
-    const el = document.getElementById('colorPicker');
-    el.innerHTML = COLORS.map(c => `<button type="button" class="swatch-btn ${c.name===state.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
-    el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
-      state.color = COLORS.find(c => c.name === btn.dataset.name);
-      leaveDesignPhotoMode();
-      renderColorPicker(); renderPreview();
-    }));
-  }
+  // moves/resizes the print-area box to match the chosen placement, and shows
+  // either the uploaded artwork (as a real image) or the typed text inside it
+  function updatePrintArea(){
+    const svg = document.querySelector('#previewGarment svg');
+    const group = svg && svg.querySelector('#print-area');
+    if(!svg || !group) return;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const placementKey = document.getElementById('placement').value;
+    const box = PLACEMENT_BOXES[placementKey] || PLACEMENT_BOXES['Front, centered'];
 
-  // updates the "No design yet / Text placed / Artwork placed" hint under the preview card —
-  // purely textual now; the actual placement is shown via the composited photo itself
-  function updatePrintAreaHint(){
+    group.setAttribute('transform', `translate(${box.x},${box.y})`);
+    const rect = group.querySelector('rect');
+    const text = group.querySelector('text');
+    rect.setAttribute('width', box.w);
+    rect.setAttribute('height', box.h);
+    text.setAttribute('x', box.w / 2);
+    text.setAttribute('y', box.h / 2 + 4);
+    text.setAttribute('font-size', box.w < 55 ? 6.5 : (box.w > 130 ? 11 : 9));
+
+    const oldImg = group.querySelector('image');
+    if(oldImg) oldImg.remove();
+    const oldClip = svg.querySelector('#print-clip');
+    if(oldClip) oldClip.remove();
+
     const hint = document.getElementById('printAreaHint');
     const hintText = document.getElementById('printAreaHintText');
-    const placementKey = document.getElementById('placement').value;
 
     if(state.artworkUrl){
+      let defs = svg.querySelector('defs');
+      if(!defs){ defs = document.createElementNS(svgNS, 'defs'); svg.insertBefore(defs, svg.firstChild); }
+      const clip = document.createElementNS(svgNS, 'clipPath');
+      clip.setAttribute('id', 'print-clip');
+      const clipRect = document.createElementNS(svgNS, 'rect');
+      clipRect.setAttribute('width', box.w);
+      clipRect.setAttribute('height', box.h);
+      clip.appendChild(clipRect);
+      defs.appendChild(clip);
+
+      const img = document.createElementNS(svgNS, 'image');
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', state.artworkUrl);
+      img.setAttribute('href', state.artworkUrl);
+      img.setAttribute('x', 0); img.setAttribute('y', 0);
+      img.setAttribute('width', box.w); img.setAttribute('height', box.h);
+      img.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      img.setAttribute('clip-path', 'url(#print-clip)');
+      group.insertBefore(img, rect);
+      rect.setAttribute('stroke-dasharray', '0');
+      text.style.display = 'none';
       hint.classList.remove('is-empty');
       hintText.textContent = `Artwork placed — ${placementKey.toLowerCase()}`;
-    }else if(state.text){
-      hint.classList.remove('is-empty');
-      hintText.textContent = `Text placed — ${placementKey.toLowerCase()}`;
     }else{
-      hint.classList.add('is-empty');
-      hintText.textContent = 'No design yet — add text or upload artwork below';
+      rect.setAttribute('stroke-dasharray', '5 4');
+      text.style.display = '';
+      text.textContent = (state.text || 'YOUR DESIGN').slice(0, box.w < 55 ? 10 : 18);
+      if(state.text){
+        hint.classList.remove('is-empty');
+        hintText.textContent = `Text placed — ${placementKey.toLowerCase()}`;
+      }else{
+        hint.classList.add('is-empty');
+        hintText.textContent = 'No design yet — add text or upload artwork below';
+      }
     }
   }
 
@@ -316,14 +355,11 @@
     previewLoadingOverlay.style.display = 'none';
   }
 
-  /** No cartoon fallback anymore — if there's no real reference photo for this garment/colour yet,
-      say so plainly instead of showing a fake preview. */
-  function showNoPhotoPlaceholder(note){
+  /** Fall back to the cartoon sketch — only used when no real photo can be shown yet. */
+  function showSketch(note){
     mockupImageEl.style.display = 'none';
-    const stage = document.getElementById('previewGarment');
-    stage.style.display = '';
-    stage.innerHTML = zgobPhotoPlaceholder(`${state.garment.name} — ${state.color.name}`, 'Reference photo not added yet');
-    previewBadgeEl.textContent = 'Reference photo needed';
+    document.getElementById('previewGarment').style.display = '';
+    previewBadgeEl.textContent = 'Sketch guide — not a real photo';
     previewLoadingOverlay.style.display = 'none';
     if(note){
       const hasDesign = !!(state.artworkUrl || state.text.trim());
@@ -339,45 +375,80 @@
     previewLoadingOverlay.style.display = 'flex';
   }
 
+  function renderPhotoThumbs(photos){
+    const strip = document.getElementById('photoThumbStrip');
+    if(!photos || photos.length < 2){
+      strip.style.display = 'none';
+      strip.innerHTML = '';
+      return;
+    }
+    strip.style.display = 'flex';
+    strip.innerHTML = photos.map((p, i) => `
+      <button type="button" class="icon-btn thumb-btn" data-index="${i}" style="padding:0; border:2px solid ${i===state.photoIndex ? 'var(--thread)' : 'var(--line)'}; border-radius:2px; overflow:hidden; width:56px; height:56px;">
+        <img src="${p.photoUrl}" alt="Photo ${i+1}" style="width:100%; height:100%; object-fit:cover; display:block; background:#fff;">
+      </button>
+    `).join('');
+    strip.querySelectorAll('.thumb-btn').forEach(btn => btn.addEventListener('click', () => {
+      state.photoIndex = Number(btn.dataset.index);
+      renderPreview();
+    }));
+  }
+
   function renderPreview(){
     const hint = document.getElementById('printAreaHint');
-    updatePrintAreaHint();
+
+    // keep the underlying sketch SVG in sync regardless of whether it's the one shown —
+    // it still drives the print-area hint text and stands in as the fallback visual.
+    const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
+    document.getElementById('previewGarment').innerHTML = zgobGarmentSVG(svgType, state.color.hex);
+    updatePrintArea();
 
     document.getElementById('previewGarmentName').textContent = state.garment.name;
-    document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
+    document.getElementById('previewSize').textContent = document.getElementById('size').value;
     document.getElementById('previewPlacement').textContent = document.getElementById('placement').value;
-    const qty = Number(document.getElementById('quantity').value) || 1;
-    document.getElementById('previewPrice').textContent = `₱${(state.garment.price * qty).toFixed(2)}`;
 
     // any change invalidates whatever real photo was showing before
     if(state.lastMockupBlobUrl){ URL.revokeObjectURL(state.lastMockupBlobUrl); state.lastMockupBlobUrl = null; }
     mockupGenerationId++; // invalidate any in-flight generation from before this change
 
     if(state.useDesignPhoto && state.designPhotoUrl){
+      const qty = Number(document.getElementById('quantity').value) || 1;
+      document.getElementById('previewPrice').textContent = `₱${(state.garment.price * qty).toFixed(2)}`;
       showRealPhoto(state.designPhotoUrl, 'Photo-realistic preview');
       hint.style.display = 'none';
+      renderPhotoThumbs(null);
       return;
     }
     hint.style.display = '';
 
     const hasDesign = !!(state.artworkUrl || state.text.trim());
-    const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.color.name);
+    const photos = zgobGarmentPhotoList(state.garment.name);
+    const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.photoIndex);
+    renderPhotoThumbs(photos);
 
-    if(!hasDesign){
-      // nothing to composite yet — if we have a real blank photo for this garment/colour, show that;
-      // otherwise say plainly that one hasn't been added yet
-      if(photoConfig) showRealPhoto(photoConfig.photoUrl, 'Photo-realistic preview');
-      else showNoPhotoPlaceholder('No reference photo on file for this garment/colour yet — add one in Admin → Garment reference photos.');
+    const qty = Number(document.getElementById('quantity').value) || 1;
+    const extraPrice = (photoConfig && photoConfig.quad) ? (photoConfig.extraPrice || 0) : 0;
+    document.getElementById('previewPrice').textContent = `₱${((state.garment.price + extraPrice) * qty).toFixed(2)}`;
+
+    if(!photoConfig || !photoConfig.quad){
+      // no real photo for this garment at all yet — nothing to composite onto
+      showSketch(`No real photo on file for "${state.garment.name}" yet — add one at /calibrate.html.`);
       return;
     }
 
-    // there's a design — try for a real photo mockup; land on the placeholder only if that genuinely fails
-    setPreviewLoading(photoConfig ? 'Rendering on the photo…' : 'Checking for a reference photo…');
+    if(!hasDesign){
+      // nothing to composite yet, but we do have a real blank photo for this garment — show that instead of the cartoon
+      showRealPhoto(photoConfig.photoUrl, 'Photo-realistic preview');
+      return;
+    }
+
+    // there's a design and a real photo — render it
+    setPreviewLoading('Rendering on the photo…');
     scheduleAutoMockup();
   }
 
   /** Any direct customization action means the shopper is no longer just looking at the design's
-      stock photo — switch back to the live, editable photo-compositor preview. */
+      stock photo — switch back to the live, editable sketch/photo-compositor preview. */
   function leaveDesignPhotoMode(){
     if(state.useDesignPhoto){
       state.useDesignPhoto = false;
@@ -445,7 +516,7 @@
     showBuiltPreview();
   });
 
-  /* ---------------- photo-realistic mockup (calibrated real-photo compositor) ---------------- */
+  /* ---------------- photo-realistic mockup (calibrated compositor only — no third-party service) ---------------- */
   let mockupGenerationId = 0;   // guards against a slow, stale request overwriting a newer one
   let mockupDebounceTimer = null;
 
@@ -470,17 +541,16 @@
     return state.localTextDesignUrl;
   }
 
-  /** The real-mockup pipeline. Ignores its own result if a newer run has started (garment/colour/design
-      changed again in the meantime). Only path now is the calibrated real-photo compositor — if this
-      garment/colour hasn't been photographed and calibrated yet (Admin → Garment reference photos),
-      we say so plainly instead of faking a preview. */
+  /** The real-mockup pipeline. Ignores its own result if a newer run has started (garment/photo/design
+      changed again in the meantime). Composites onto the currently-selected reference photo for this garment —
+      if that garment has no reference photo yet, this falls back to the sketch. */
   async function runMockupGeneration(){
     if(!(state.artworkUrl || state.text.trim())) return;
     const myId = ++mockupGenerationId;
 
-    const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.color.name);
+    const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.photoIndex);
     if(!(photoConfig && photoConfig.quad)){
-      showNoPhotoPlaceholder(`No reference photo on file yet for ${state.garment.name} in ${state.color.name} — add and calibrate one in Admin → Garment reference photos. We'll confirm the design against a real proof before printing.`);
+      showSketch(`No real photo on file for "${state.garment.name}" yet — add one at /calibrate.html.`);
       return;
     }
 
@@ -503,7 +573,8 @@
       showRealPhoto(state.lastMockupBlobUrl, 'Photo-realistic preview');
     }catch(err){
       if(myId !== mockupGenerationId) return;
-      showNoPhotoPlaceholder(err.message || 'Could not render a preview for this garment/colour yet.');
+      // only now, having actually tried, fall back to the sketch — with a retry link and the reason why
+      showSketch(err.message || 'No photo-realistic preview available for this garment yet.');
       console.error(err);
     }
   }
@@ -524,7 +595,6 @@
   });
 
   renderGarmentPicker();
-  renderColorPicker();
   renderPreview();
 
   formEl.addEventListener('submit', async (e) => {

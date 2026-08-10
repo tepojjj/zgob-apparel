@@ -126,7 +126,7 @@ const ZgobStore = (() => {
 
     /* ---------------- garment reference photos ---------------- */
     async getGarmentPhotos(){
-      return orThrow(await client.from('garment_photos').select('*').order('garment'));
+      return orThrow(await client.from('garment_photos').select('*').order('garment').order('created_at'));
     },
     /** Upload a real blank-garment reference photo, return its public URL. Same bucket as design/artwork uploads. */
     async uploadGarmentPhoto(fileOrBlob){
@@ -136,11 +136,20 @@ const ZgobStore = (() => {
       if(upload.error) throw upload.error;
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
-    /** Save (or replace) the reference photo for a garment+colour pair. quad = [[x,y]x4] print-area corners, or null if not calibrated yet. */
-    async saveGarmentPhoto({ garment, color, imageUrl, quad }){
+    /** Add a reference photo for a garment. Multiple photos per garment are allowed (e.g. front/back, different angles) —
+        this always inserts a new row rather than replacing an existing one. quad = [[x,y]x4] print-area corners, auto-computed
+        (no manual calibration step). extraPrice is an optional surcharge added on top of the garment's base price when a
+        shopper's preview uses this particular photo. `color` is kept for schema compatibility but is always "White". */
+    async addGarmentPhoto({ garment, color, imageUrl, quad, extraPrice }){
       return orThrow(await client.from('garment_photos')
-        .upsert({ garment, color, image_url: imageUrl, quad: quad || null }, { onConflict: 'garment,color' })
+        .insert({ garment, color: color || 'White', image_url: imageUrl, quad: quad || null, extra_price: extraPrice || 0 })
         .select().single());
+    },
+    /** Update just the surcharge on an existing reference photo. */
+    async updateGarmentPhotoPrice(id, extraPrice){
+      return orThrow(await client.from('garment_photos')
+        .update({ extra_price: extraPrice || 0 })
+        .eq('id', id).select().single());
     },
     async deleteGarmentPhoto(id){
       orThrow(await client.from('garment_photos').delete().eq('id', id));

@@ -3,5 +3,5 @@
   "private": true,
   "type": "module",
   "version": "1.0.0",
-  "description": "Zgob Apparel — static storefront (Supabase) with client-side, real-photo mockup compositing."
+  "description": "Zgob Apparel — static storefront (Supabase). Photo-realistic mockups are generated entirely client-side from your own calibrated reference photos."
 }

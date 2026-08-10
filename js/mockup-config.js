@@ -15,9 +15,9 @@
       garment instead of floating on top of it).
    3. Paste the printed quad array in below.
 
-   Until a real entry exists for a given type+color, customize.html shows
-   a plain "reference photo needed" placeholder — nothing breaks while
-   you're photographing the rest of the catalogue.
+   Until a real entry exists for a given type+color, customize.html falls
+   back to the existing procedural SVG mockup (zgobGarmentSVG) — nothing
+   breaks while you're photographing the rest of the catalogue.
 */
 
 const ZGOB_MOCKUP_CONFIG = {
