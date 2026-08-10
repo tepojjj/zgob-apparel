@@ -163,6 +163,24 @@
 
 </main>
 
+<!-- design detail modal -->
+<div class="modal-overlay" id="designModal">
+  <div class="modal-panel">
+    <button class="modal-close" id="modalCloseBtn" aria-label="Close">✕</button>
+    <div class="modal-media" id="modalMedia"></div>
+    <div class="modal-body">
+      <div class="tag" id="modalTag" style="align-self:flex-start; margin-bottom:14px; display:none;"></div>
+      <h2 style="font-size:26px; margin-bottom:8px;" id="modalTitle"></h2>
+      <p class="graphite-text" id="modalCategory" style="font-size:13px; margin-bottom:16px;"></p>
+      <p id="modalColorway" style="margin-bottom:20px;"></p>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:16px; border-top:1px solid var(--line);">
+        <span style="font-family:'Space Mono',monospace; font-weight:700; font-size:20px;" id="modalPrice"></span>
+        <a href="#" class="btn btn-primary" id="modalCta">Start from this →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer class="site-footer">
   <div class="wrap">
     <div class="footer-grid">
@@ -278,25 +296,69 @@
   }
 
   const featuredEl = document.getElementById('featuredDesigns');
+  let featuredDesigns = [];
   try{
-    const featured = (await ZgobStore.getDesigns()).slice(0, 4);
-    featuredEl.innerHTML = featured.map(d => `
-      <div class="card" style="display:flex; flex-direction:column;">
+    featuredDesigns = (await ZgobStore.getDesigns()).slice(0, 4);
+    featuredEl.innerHTML = featuredDesigns.map(d => `
+      <div class="card design-thumb" data-id="${d.id}" style="display:flex; flex-direction:column; cursor:pointer;">
         <div style="background: var(--ink); border:1px solid var(--line); border-radius:2px; overflow:hidden; margin-bottom:16px; aspect-ratio:1; display:flex; align-items:center; justify-content:center;">
           ${d.image_url
-            ? `<img src="${d.image_url}" alt="${d.title} on a real garment" loading="lazy" style="width:100%; height:100%; object-fit:cover;">`
+            ? `<img src="${d.image_url}" alt="${zgobEscape(d.title)} on a real garment" loading="lazy" style="width:100%; height:100%; object-fit:cover;">`
             : `<div style="padding:14px; width:100%;">${zgobGarmentSVG('Tee', d.swatch[d.swatch.length-1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0,10))}</div>`}
         </div>
-        <div class="tag" style="margin-bottom:10px; align-self:flex-start;">${d.category}</div>
-        <h3>${d.title}</h3>
-        <p class="graphite-text" style="font-size:14px; flex:1;">${d.colorway}</p>
+        <div class="tag" style="margin-bottom:10px; align-self:flex-start;">${zgobEscape(d.category)}</div>
+        <h3>${zgobEscape(d.title)}</h3>
+        <p class="graphite-text" style="font-size:14px; flex:1;">${zgobEscape(d.colorway)}</p>
         <p class="tag-card-price" style="font-family:'Space Mono',monospace; font-weight:700;">₱${d.price}</p>
       </div>
     `).join('');
+    featuredEl.querySelectorAll('.design-thumb').forEach(el => {
+      el.addEventListener('click', () => openDesignModal(featuredDesigns.find(d => d.id === el.dataset.id)));
+    });
   }catch(err){
     featuredEl.innerHTML = `<div class="empty-state">Couldn't load designs — check js/config.js has your Supabase URL and key.</div>`;
     console.error(err);
   }
+
+  /* ---------------- design detail modal (same pattern as designs.html) ---------------- */
+  const designModal = document.getElementById('designModal');
+  const modalMedia = document.getElementById('modalMedia');
+  const modalTag = document.getElementById('modalTag');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalCategory = document.getElementById('modalCategory');
+  const modalColorway = document.getElementById('modalColorway');
+  const modalPrice = document.getElementById('modalPrice');
+  const modalCta = document.getElementById('modalCta');
+
+  function openDesignModal(d){
+    if(!d) return;
+    modalMedia.innerHTML = d.image_url
+      ? `<img src="${d.image_url}" alt="${zgobEscape(d.title)} on a real garment">`
+      : zgobGarmentSVG('Tee', d.swatch[d.swatch.length - 1] || '#ede6d6').replace('YOUR DESIGN', d.title.toUpperCase().slice(0, 10));
+    if(d.tags && d.tags.length){
+      modalTag.style.display = 'inline-block';
+      modalTag.textContent = d.tags[0];
+      modalTag.style.color = 'var(--thread)';
+      modalTag.style.borderColor = 'var(--thread)';
+    }else{
+      modalTag.style.display = 'none';
+    }
+    modalTitle.textContent = d.title;
+    modalCategory.textContent = d.category;
+    modalColorway.textContent = d.colorway;
+    modalPrice.textContent = `₱${d.price}`;
+    modalCta.textContent = `${d.artwork_url ? 'Use this design' : 'Start from this'} →`;
+    modalCta.href = `customize.html?design=${encodeURIComponent(d.id)}`;
+    designModal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDesignModal(){
+    designModal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('modalCloseBtn').addEventListener('click', closeDesignModal);
+  designModal.addEventListener('click', (e) => { if(e.target === designModal) closeDesignModal(); });
+  document.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeDesignModal(); });
 })();
 </script>
 </body>

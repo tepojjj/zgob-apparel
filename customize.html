@@ -219,6 +219,8 @@
     lastMockupBlobUrl: null,   // the currently-shown composited/Printful result, so we can revoke it before replacing
     referenceMockupFile: null, // a customer-supplied, already-finished mockup image (bypasses our own preview entirely)
     referenceMockupPreviewUrl: null, // local blob: URL for showing it immediately
+    designPhotoUrl: null,   // a picked house design's own real photo (designs.image_url)
+    useDesignPhoto: false,  // true right after picking a design with a photo — cleared the moment they customize anything
   };
 
   // approximate print-area box per placement, in the garment SVG's own 300x320 coordinate space
@@ -255,12 +257,20 @@
         state.uploadedArtworkUrl = chosen.artwork_url; // already hosted, no upload needed before ordering/mockup
         note.style.display = 'block';
         note.textContent = `Starting from the "${chosen.title}" house design — the artwork's already loaded below. Adjust the garment, colour or placement, or swap in your own file.`;
+        if(chosen.image_url){
+          state.designPhotoUrl = chosen.image_url;
+          state.useDesignPhoto = true;
+        }
       }else if(chosen){
         // no print-ready artwork on file for this design yet — fall back to the old text-prefill behaviour
         state.text = chosen.title.toUpperCase();
         document.getElementById('designText').value = chosen.title.toUpperCase();
         note.style.display = 'block';
         note.textContent = `Starting from the "${chosen.title}" house design — feel free to adjust the garment, colour or text below.`;
+        if(chosen.image_url){
+          state.designPhotoUrl = chosen.image_url;
+          state.useDesignPhoto = true;
+        }
       }else{
         // unknown id — fall back to treating the raw param as a title, same as before
         state.text = designParam.toUpperCase();
@@ -278,6 +288,7 @@
     el.innerHTML = GARMENTS.map(g => `<button type="button" class="chip ${g.id===state.garment.id?'selected':''}" data-id="${g.id}">${g.name}</button>`).join('');
     el.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
       state.garment = GARMENTS.find(g => g.id === btn.dataset.id);
+      leaveDesignPhotoMode();
       renderGarmentPicker(); renderPreview(); scheduleAutoMockup();
     }));
   }
@@ -287,6 +298,7 @@
     el.innerHTML = COLORS.map(c => `<button type="button" class="swatch-btn ${c.name===state.color.name?'selected':''}" style="background:${c.hex};" data-name="${c.name}" title="${c.name}" aria-label="${c.name}"></button>`).join('');
     el.querySelectorAll('.swatch-btn').forEach(btn => btn.addEventListener('click', () => {
       state.color = COLORS.find(c => c.name === btn.dataset.name);
+      leaveDesignPhotoMode();
       renderColorPicker(); renderPreview(); scheduleAutoMockup();
     }));
   }
@@ -356,14 +368,31 @@
   }
 
   function renderPreview(){
-    const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
-    document.getElementById('previewGarment').innerHTML = zgobGarmentSVG(svgType, state.color.hex);
+    const previewEl = document.getElementById('previewGarment');
+    const sketchBadge = document.getElementById('sketchBadge');
+    const hint = document.getElementById('printAreaHint');
+
+    if(state.useDesignPhoto && state.designPhotoUrl){
+      previewEl.style.cssText = 'width:100%; height:100%; display:flex; align-items:center; justify-content:center;';
+      previewEl.innerHTML = `<img src="${state.designPhotoUrl}" alt="${zgobEscape(state.garment.name)}" style="max-width:100%; max-height:100%; border-radius:2px;">`;
+      sketchBadge.style.display = 'none';
+      hint.style.display = 'none';
+      document.getElementById('mockupCard').style.display = 'none';
+    }else{
+      previewEl.style.cssText = '';
+      const svgType = state.garment.category === 'Long Sleeve' ? 'Long Sleeve' : (state.garment.category || 'Tee');
+      previewEl.innerHTML = zgobGarmentSVG(svgType, state.color.hex);
+      sketchBadge.style.display = '';
+      hint.style.display = '';
+      document.getElementById('mockupCard').style.display = '';
+      updatePrintArea();
+    }
+
     document.getElementById('previewGarmentName').textContent = state.garment.name;
     document.getElementById('previewColorSize').textContent = `${state.color.name} / ${document.getElementById('size').value}`;
     document.getElementById('previewPlacement').textContent = document.getElementById('placement').value;
     const qty = Number(document.getElementById('quantity').value) || 1;
     document.getElementById('previewPrice').textContent = `₱${(state.garment.price * qty).toFixed(2)}`;
-    updatePrintArea();
     // any change to garment/color/etc. invalidates a previously generated photo mockup
     const mockupResultEl = document.getElementById('mockupResult');
     const garmentStageEl = document.getElementById('builtGarmentStage');
@@ -373,21 +402,31 @@
     }
   }
 
+  /** Any direct customization action means the shopper is no longer just looking at the design's
+      stock photo — switch back to the live, editable sketch/photo-compositor preview. */
+  function leaveDesignPhotoMode(){
+    if(state.useDesignPhoto){
+      state.useDesignPhoto = false;
+    }
+  }
+
   document.getElementById('designText').addEventListener('input', e => {
     state.text = e.target.value;
+    leaveDesignPhotoMode();
     renderPreview();
     updateMockupButtonState();
     scheduleAutoMockup();
   });
   document.getElementById('size').addEventListener('change', () => { renderPreview(); scheduleAutoMockup(); });
   document.getElementById('quantity').addEventListener('input', renderPreview);
-  document.getElementById('placement').addEventListener('change', () => { renderPreview(); scheduleAutoMockup(); });
+  document.getElementById('placement').addEventListener('change', () => { leaveDesignPhotoMode(); renderPreview(); scheduleAutoMockup(); });
   document.getElementById('artwork').addEventListener('change', e => {
     if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
     const file = e.target.files[0] || null;
     state.artworkUrl = file ? URL.createObjectURL(file) : null;
     state.artworkFile = file;
     state.uploadedArtworkUrl = null; // a new/changed file needs re-uploading before a mockup can use it
+    leaveDesignPhotoMode();
     const nameEl = document.getElementById('artworkFileName');
     if(file){ nameEl.style.display = 'block'; nameEl.textContent = `Selected: ${file.name}`; }
     else{ nameEl.style.display = 'none'; nameEl.textContent = ''; }
@@ -576,7 +615,7 @@
   renderGarmentPicker();
   renderColorPicker();
   renderPreview();
-  if(state.artworkUrl) scheduleAutoMockup(); // a design was preloaded with real artwork — go straight to the photo-realistic preview
+  if(state.artworkUrl && !state.useDesignPhoto) scheduleAutoMockup(); // a design was preloaded with real artwork — go straight to the photo-realistic preview
 
   formEl.addEventListener('submit', async (e) => {
     e.preventDefault();
