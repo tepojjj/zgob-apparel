@@ -243,6 +243,71 @@ const ZgobStore = (() => {
     async isLoggedIn(){
       const { data } = await client.auth.getSession();
       return !!data.session;
+    },
+    /** The current signed-in user's own id — used client-side only to stop an admin from
+        accidentally deleting or demoting their own account from the Staff tab. */
+    async getMyId(){
+      const { data } = await client.auth.getUser();
+      return (data && data.user && data.user.id) || null;
+    },
+    /** Returns 'admin' or 'staff' for the currently signed-in user, based on their row in
+        public.profiles. Fails closed to 'staff' (the least-privileged role) if the row is
+        missing or the request errors — never assume admin when something's unclear. This
+        is a UI convenience only; the actual enforcement is server-side via RLS/is_admin(). */
+    async getMyRole(){
+      try{
+        const { data: userData } = await client.auth.getUser();
+        const uid = userData && userData.user && userData.user.id;
+        if(!uid) return 'staff';
+        const { data, error } = await client.from('profiles').select('role').eq('id', uid).single();
+        if(error || !data) return 'staff';
+        return data.role === 'admin' ? 'admin' : 'staff';
+      }catch(err){
+        console.error('Failed to fetch role, defaulting to staff:', err);
+        return 'staff';
+      }
+    },
+
+    /* ---------------- staff management (admin-only, enforced by RLS + the server endpoint below) ---------------- */
+    /** Every account with a profile row — id, email, role, created_at. RLS only lets admins see every
+        row (a non-admin only ever sees their own), so this naturally returns just one row for staff. */
+    async getAllProfiles(){
+      return orThrow(await client.from('profiles').select('*').order('role').order('email'));
+    },
+    /** Change an existing account's role. Uses the normal client + RLS (the "admins manage profiles"
+        policy) — no server call needed since this doesn't touch Supabase Auth itself, just our own table. */
+    async setUserRole(userId, role){
+      return orThrow(await client.from('profiles').update({ role }).eq('id', userId).select().single());
+    },
+    /** Creates a brand-new login account (email + password) with the given role. Goes through
+        /api/manage-staff because creating an Auth user needs the service_role key, which only
+        that server-side endpoint holds — the browser never sees it. */
+    async createStaffAccount(email, password, role){
+      const { data: sessionData } = await client.auth.getSession();
+      const token = sessionData && sessionData.session && sessionData.session.access_token;
+      if(!token) return { ok:false, message: 'Not signed in.' };
+      const res = await fetch('/api/manage-staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ email, password, role })
+      });
+      const body = await res.json().catch(() => ({}));
+      if(!res.ok) return { ok:false, message: body.error || 'Failed to create the account.' };
+      return { ok:true, id: body.id };
+    },
+    /** Permanently removes a login account. Also goes through /api/manage-staff for the same reason. */
+    async deleteStaffAccount(userId){
+      const { data: sessionData } = await client.auth.getSession();
+      const token = sessionData && sessionData.session && sessionData.session.access_token;
+      if(!token) return { ok:false, message: 'Not signed in.' };
+      const res = await fetch('/api/manage-staff', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ userId })
+      });
+      const body = await res.json().catch(() => ({}));
+      if(!res.ok) return { ok:false, message: body.error || 'Failed to remove the account.' };
+      return { ok:true };
     }
   };
 })();

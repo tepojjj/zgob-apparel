@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   let analyticsOrders = []; // raw orders, re-filtered locally whenever the range buttons change
   let analyticsInventory = []; // for estimating revenue on pre-price-tracking orders
   let currentAnalyticsRange = '30';
+  let currentUserRole = 'staff'; // fetched fresh after every sign-in; fails closed to least-privileged if the fetch errors
+  let currentUserId = null; // this user's own id, so the Staff tab can stop them removing/demoting themselves
   let orderGroupsCache = []; // orders grouped into job orders, kept for the Receipt button's click handler
 
   // design form fields — declared up here (rather than down near the rest of the
@@ -67,7 +69,50 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function showDashboard(){
     loginView.style.display = 'none';
     dashboardView.style.display = 'block';
+    currentUserRole = await ZgobStore.getMyRole();
+    currentUserId = await ZgobStore.getMyId();
+    applyRolePermissions();
     await renderAll();
+  }
+
+  // hides/disables everything staff shouldn't touch. Elements here are static (present once
+  // in the page, not re-rendered per row) — dynamic per-row controls (order/design/message
+  // action buttons, editable inventory cells) are gated inside their own render functions
+  // below instead, since those get rebuilt on every refresh.
+  function applyRolePermissions(){
+    const isAdmin = currentUserRole === 'admin';
+    const roleBadge = document.getElementById('roleBadge');
+    if(roleBadge) roleBadge.textContent = isAdmin ? 'Admin' : 'Staff (view & print only)';
+
+    document.querySelectorAll('.admin-tab[data-tab="analytics"]').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    const analyticsPanel = document.getElementById('tab-analytics');
+    if(analyticsPanel && !isAdmin) analyticsPanel.classList.remove('active');
+
+    document.querySelectorAll('.admin-tab[data-tab="staff"]').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    const staffPanel = document.getElementById('tab-staff');
+    if(staffPanel && !isAdmin) staffPanel.classList.remove('active');
+
+    const viewCancelledBtn = document.getElementById('viewCancelledBtn');
+    if(viewCancelledBtn) viewCancelledBtn.style.display = isAdmin ? '' : 'none';
+    const cancelledPanel = document.getElementById('cancelledPanel');
+    if(cancelledPanel && !isAdmin) cancelledPanel.style.display = 'none';
+
+    const resetBtn = document.getElementById('resetReceiptSeqBtn');
+    if(resetBtn){
+      resetBtn.style.display = isAdmin ? '' : 'none';
+      const hint = resetBtn.nextElementSibling;
+      if(hint && hint.tagName === 'P') hint.style.display = isAdmin ? '' : 'none';
+    }
+
+    const refPhotosLink = document.getElementById('refPhotosLink');
+    if(refPhotosLink) refPhotosLink.style.display = isAdmin ? '' : 'none';
+
+    // the whole "add/edit a design" form, including the bulk-link button — staff can still
+    // browse the Designs table itself (rendered further down), just not change it
+    const designFormCard = document.getElementById('designFormCard');
+    if(designFormCard) designFormCard.style.display = isAdmin ? '' : 'none';
+    const bulkLinkBtn = document.getElementById('bulkLinkDesignsBtn');
+    if(bulkLinkBtn) bulkLinkBtn.style.display = isAdmin ? '' : 'none';
   }
 
   // tab switching — wired up before the initial render so a render error
@@ -121,8 +166,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   async function renderAll(){
-    const [orders, inventory, designs, messages, voidedReceipts] = await Promise.all([
-      ZgobStore.getOrders(), ZgobStore.getInventory(), ZgobStore.getDesigns(), ZgobStore.getMessages(), ZgobStore.getVoidedReceipts()
+    const isAdmin = currentUserRole === 'admin';
+    const [orders, inventory, designs, messages, voidedReceipts, profiles] = await Promise.all([
+      ZgobStore.getOrders(), ZgobStore.getInventory(), ZgobStore.getDesigns(), ZgobStore.getMessages(),
+      isAdmin ? ZgobStore.getVoidedReceipts() : Promise.resolve([]), // staff can't read this table at all — don't even ask
+      isAdmin ? ZgobStore.getAllProfiles() : Promise.resolve([])     // Staff tab is admin-only too
     ]);
     analyticsOrders = orders;
     analyticsInventory = inventory;
@@ -133,6 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderInventory(inventory);
     renderDesigns(designs);
     renderMessages(messages);
+    if(isAdmin) renderStaff(profiles);
   }
 
   function renderStats(orders, inventory, messages){
@@ -345,6 +394,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderAll();
       });
     });
+
+    // staff can view and print orders, but not edit or delete them
+    if(currentUserRole !== 'admin'){
+      body.querySelectorAll('.order-receipt-no').forEach(el => el.disabled = true);
+      body.querySelectorAll('.order-status').forEach(el => el.disabled = true);
+      body.querySelectorAll('.delete-order').forEach(el => el.style.display = 'none');
+    }
   }
 
   function renderCancelled(voidedReceipts){
@@ -702,6 +758,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderAll();
       });
     });
+
+    // staff can see stock and pricing, but not change them
+    if(currentUserRole !== 'admin'){
+      body.querySelectorAll('.price-input').forEach(el => el.disabled = true);
+      body.querySelectorAll('.stock-input').forEach(el => el.disabled = true);
+    }
   }
 
   /* ---------------- designs ---------------- */
@@ -900,6 +962,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
+
+    // staff can browse the design catalogue, but not edit or delete entries
+    if(currentUserRole !== 'admin'){
+      body.querySelectorAll('.edit-design').forEach(el => el.style.display = 'none');
+      body.querySelectorAll('.delete-design').forEach(el => el.style.display = 'none');
+    }
   }
 
   function renderMessages(messages){
@@ -938,5 +1006,101 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
+
+    // staff can read the inbox, but not mark messages read/unread or delete them
+    if(currentUserRole !== 'admin'){
+      body.querySelectorAll('.toggle-read').forEach(el => el.style.display = 'none');
+      body.querySelectorAll('.delete-message').forEach(el => el.style.display = 'none');
+    }
   }
+
+  /* ---------------- staff (admin-only tab) ---------------- */
+  function renderStaff(profiles){
+    const body = document.getElementById('staffBody');
+    document.getElementById('staffEmpty').style.display = profiles.length ? 'none' : 'block';
+
+    body.innerHTML = profiles.map(p => {
+      const isSelf = p.id === currentUserId;
+      return `
+      <tr>
+        <td>${zgobEscape(p.email || '(no email on file)')}${isSelf ? ' <span class="graphite-text" style="font-size:11px;">(you)</span>' : ''}</td>
+        <td>
+          <select class="staff-role" data-id="${p.id}" ${isSelf ? 'disabled title="You can\'t change your own role."' : ''}
+            style="font-family:'Space Mono',monospace; font-size:12px; background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px; padding:6px 8px;">
+            <option value="staff" ${p.role==='staff'?'selected':''}>Staff — view & print only</option>
+            <option value="admin" ${p.role==='admin'?'selected':''}>Admin — full access</option>
+          </select>
+        </td>
+        <td>${zgobFormatDate(p.created_at)}</td>
+        <td>${isSelf ? '' : `<button class="icon-btn delete-staff" data-id="${p.id}" data-email="${zgobEscape(p.email||'this account')}">Remove</button>`}</td>
+      </tr>
+    `;
+    }).join('');
+
+    body.querySelectorAll('.staff-role').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const prevValue = sel.value === 'admin' ? 'staff' : 'admin'; // for revert-on-failure
+        try{
+          await ZgobStore.setUserRole(sel.dataset.id, sel.value);
+          zgobToast('Role updated.');
+          renderAll();
+        }catch(err){
+          zgobToast('Could not update the role.');
+          console.error(err);
+          sel.value = prevValue;
+        }
+      });
+    });
+    body.querySelectorAll('.delete-staff').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm(`Remove ${btn.dataset.email}'s account? They'll immediately lose access. This cannot be undone.`)) return;
+        const result = await ZgobStore.deleteStaffAccount(btn.dataset.id);
+        if(result.ok){
+          zgobToast('Account removed.');
+          renderAll();
+        }else{
+          zgobToast(result.message || 'Could not remove the account.');
+        }
+      });
+    });
+  }
+
+  document.getElementById('staffCreateBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('staffCreateBtn');
+    const errorEl = document.getElementById('staffCreateError');
+    const emailInput = document.getElementById('staffEmail');
+    const passwordInput = document.getElementById('staffPassword');
+    const roleSelect = document.getElementById('staffRole');
+    errorEl.style.display = 'none';
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    const role = roleSelect.value;
+    if(!email || !password){
+      errorEl.textContent = 'Email and a temporary password are both required.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
+    try{
+      const result = await ZgobStore.createStaffAccount(email, password, role);
+      if(result.ok){
+        zgobToast(`Account created for ${email}.`);
+        emailInput.value = ''; passwordInput.value = ''; roleSelect.value = 'staff';
+        renderAll();
+      }else{
+        errorEl.textContent = result.message || 'Could not create the account.';
+        errorEl.style.display = 'block';
+      }
+    }catch(err){
+      errorEl.textContent = 'Could not create the account.';
+      errorEl.style.display = 'block';
+      console.error(err);
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Create account →';
+    }
+  });
 });

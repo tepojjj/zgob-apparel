@@ -46,7 +46,10 @@
   </section>
 
   <section class="section-light" style="padding-top:40px;">
-    <div class="wrap ref-wrap">
+    <div id="refAuthGate" class="wrap" style="display:none; padding:40px 0;">
+      <div class="callout" id="refAuthMessage" style="max-width:520px;"></div>
+    </div>
+    <div class="wrap ref-wrap" id="refToolContent" style="display:none;">
 
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -104,6 +107,25 @@
 <script src="js/store.js"></script>
 <script>
 (async () => {
+  // gate this whole page behind admin-only access — staff (and anyone signed out) never
+  // see the tool itself, just a message. The real enforcement is server-side (RLS/is_admin()
+  // on garment_photos), this just avoids showing staff a form they can't actually use.
+  const refAuthGate = document.getElementById('refAuthGate');
+  const refAuthMessage = document.getElementById('refAuthMessage');
+  const refToolContent = document.getElementById('refToolContent');
+  const loggedIn = await ZgobStore.isLoggedIn();
+  if(!loggedIn){
+    window.location.href = 'admin.html';
+    return;
+  }
+  const myRole = await ZgobStore.getMyRole();
+  if(myRole !== 'admin'){
+    refAuthGate.style.display = 'block';
+    refAuthMessage.textContent = 'This tool is for admins only. Staff accounts can view and print from the admin panel, but reference photos are managed by admins — head back to Admin.';
+    return;
+  }
+  refToolContent.style.display = '';
+
   const photoFile = document.getElementById('photoFile');
   const photoFileLabel = document.getElementById('photoFileLabel');
   const extraPriceInput = document.getElementById('extraPrice');

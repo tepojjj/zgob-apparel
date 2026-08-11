@@ -97,15 +97,21 @@ $$;
 grant execute on function public.next_receipt_no() to anon, authenticated;
 
 -- Lets an admin restart numbering (e.g. resetting to JO-000001 before going live after
--- testing) without touching any orders already saved. Restricted to signed-in admins —
--- anonymous/public visitors can request the *next* number (above) but never reset it.
+-- testing) without touching any orders already saved. Restricted to admins specifically
+-- (not just any signed-in user) — this raises an error for staff even if someone calls
+-- it directly, not just when the button is hidden from them in the UI.
 create or replace function public.reset_receipt_seq(start_at integer default 1)
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
-  select setval('public.orders_receipt_seq', start_at, false);
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can reset job order numbering';
+  end if;
+  perform setval('public.orders_receipt_seq', start_at, false);
+end;
 $$;
 
 revoke all on function public.reset_receipt_seq(integer) from public;
@@ -149,11 +155,84 @@ alter table public.garment_photos add column if not exists extra_price numeric n
 alter table public.garment_photos drop constraint if exists garment_photos_garment_color_key;
 
 -- ---------------------------------------------------------
+-- STAFF ROLES
+-- Every signed-in admin-panel user is either 'admin' (full access) or
+-- 'staff' (view + print only — no editing, no deleting, no access to
+-- Analytics, Cancelled/voided receipts, or the job-order reset button).
+-- New signups default to 'staff' (fail-closed) — promote someone to
+-- admin manually, see the UPDATE statement below.
+-- ---------------------------------------------------------
+
+create table if not exists public.profiles (
+  id          uuid primary key references auth.users(id) on delete cascade,
+  email       text,
+  role        text not null default 'staff' check (role in ('admin','staff')),
+  created_at  timestamptz not null default now()
+);
+
+-- auto-creates a 'staff' profile row the moment someone signs up, so role checks
+-- never fail open for a user who has no row yet
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, role)
+  values (new.id, new.email, 'staff')
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- security-definer so it can be called from any RLS policy without those policies
+-- needing their own read access into profiles
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles where id = auth.uid() and role = 'admin'
+  );
+$$;
+
+grant execute on function public.is_admin() to authenticated;
+
+alter table public.profiles enable row level security;
+
+drop policy if exists "users can view own profile, admins view all" on public.profiles;
+create policy "users can view own profile, admins view all"
+  on public.profiles for select
+  using (auth.uid() = id or public.is_admin());
+
+drop policy if exists "admins manage profiles" on public.profiles;
+create policy "admins manage profiles"
+  on public.profiles for all
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- ONE-TIME SETUP: after you (the shop owner) sign in to the admin panel for the
+-- first time, promote your own account to admin by running this once, with your
+-- real email:
+--   update public.profiles set role = 'admin' where email = 'you@example.com';
+-- Every other signup (staff you create in Supabase → Authentication → Users)
+-- stays 'staff' automatically and can be promoted the same way if needed.
+
+-- ---------------------------------------------------------
 -- ROW LEVEL SECURITY
 -- Public site visitors use the anon key. The admin panel signs
 -- in with Supabase Auth (email + password), which upgrades the
--- request to the "authenticated" role — that's what gates every
--- admin-only action below.
+-- request to the "authenticated" role. From there, is_admin()
+-- (above) gates anything staff shouldn't be able to do.
 -- ---------------------------------------------------------
 
 alter table public.designs   enable row level security;
@@ -172,8 +251,8 @@ create policy "designs are publicly readable"
 drop policy if exists "admins manage designs" on public.designs;
 create policy "admins manage designs"
   on public.designs for all
-  using (auth.role() = 'authenticated')
-  with check (auth.role() = 'authenticated');
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- inventory: everyone can see stock/price, only admins edit it
 drop policy if exists "inventory is publicly readable" on public.inventory;
@@ -184,8 +263,8 @@ create policy "inventory is publicly readable"
 drop policy if exists "admins manage inventory" on public.inventory;
 create policy "admins manage inventory"
   on public.inventory for all
-  using (auth.role() = 'authenticated')
-  with check (auth.role() = 'authenticated');
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- orders: anyone can submit a custom order, only admins can view/manage the queue
 drop policy if exists "anyone can submit an order" on public.orders;
@@ -200,13 +279,13 @@ create policy "admins manage orders"
 drop policy if exists "admins update orders" on public.orders;
 create policy "admins update orders"
   on public.orders for update
-  using (auth.role() = 'authenticated')
-  with check (auth.role() = 'authenticated');
+  using (public.is_admin())
+  with check (public.is_admin());
 
 drop policy if exists "admins delete orders" on public.orders;
 create policy "admins delete orders"
   on public.orders for delete
-  using (auth.role() = 'authenticated');
+  using (public.is_admin());
 
 -- messages: anyone can send one, only admins can read/manage the inbox
 drop policy if exists "anyone can send a message" on public.messages;
@@ -221,13 +300,13 @@ create policy "admins manage messages"
 drop policy if exists "admins update messages" on public.messages;
 create policy "admins update messages"
   on public.messages for update
-  using (auth.role() = 'authenticated')
-  with check (auth.role() = 'authenticated');
+  using (public.is_admin())
+  with check (public.is_admin());
 
 drop policy if exists "admins delete messages" on public.messages;
 create policy "admins delete messages"
   on public.messages for delete
-  using (auth.role() = 'authenticated');
+  using (public.is_admin());
 
 -- garment_photos: everyone can see the real reference photos, only admins manage them
 drop policy if exists "garment photos are publicly readable" on public.garment_photos;
@@ -238,15 +317,16 @@ create policy "garment photos are publicly readable"
 drop policy if exists "admins manage garment photos" on public.garment_photos;
 create policy "admins manage garment photos"
   on public.garment_photos for all
-  using (auth.role() = 'authenticated')
-  with check (auth.role() = 'authenticated');
+  using (public.is_admin())
+  with check (public.is_admin());
 
--- voided_receipts: fully admin-only — this is an internal log, not customer-facing
+-- voided_receipts: fully admin-only, including viewing it — this is a confidential internal
+-- log, not something staff should see at all, unlike orders/messages which staff can view
 drop policy if exists "admins manage voided receipts" on public.voided_receipts;
 create policy "admins manage voided receipts"
   on public.voided_receipts for all
-  using (auth.role() = 'authenticated')
-  with check (auth.role() = 'authenticated');
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- ---------------------------------------------------------
 -- STORAGE — bucket for uploaded artwork files
@@ -269,7 +349,7 @@ create policy "artwork is publicly viewable"
 drop policy if exists "admins delete artwork" on storage.objects;
 create policy "admins delete artwork"
   on storage.objects for delete
-  using (bucket_id = 'artwork' and auth.role() = 'authenticated');
+  using (bucket_id = 'artwork' and public.is_admin());
 
 -- ---------------------------------------------------------
 -- SEED DATA — house designs and starting inventory

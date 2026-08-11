@@ -56,7 +56,8 @@
           <h1 style="font-size:32px; margin:0;">Zgob back office</h1>
         </div>
         <button class="btn btn-small" id="logoutBtn">Sign out</button>
-        <a href="calibrate.html" class="btn btn-small" style="margin-left:8px;">Garment reference photos</a>
+        <a href="calibrate.html" id="refPhotosLink" class="btn btn-small" style="margin-left:8px;">Garment reference photos</a>
+        <span id="roleBadge" class="graphite-text" style="margin-left:12px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; align-self:center;"></span>
       </div>
 
       <div class="stat-strip">
@@ -72,6 +73,7 @@
         <button class="admin-tab" data-tab="inventory">Inventory</button>
         <button class="admin-tab" data-tab="designs">Designs</button>
         <button class="admin-tab" data-tab="messages">Messages</button>
+        <button class="admin-tab" data-tab="staff">Staff</button>
       </div>
 
       <!-- ORDERS -->
@@ -175,7 +177,7 @@
         <p class="graphite-text" style="margin-bottom:20px;">Add a real photo of the finished garment/design here and it replaces the sketch on the public Designs page — this is what customers see as a reference for what a print actually looks like on real fabric.</p>
         <button type="button" class="btn btn-small" id="bulkLinkDesignsBtn" style="margin-bottom:20px;">Link all designs to matching Inventory items (₱0 markup) →</button>
 
-        <div class="card" style="margin-bottom:28px;">
+        <div class="card" id="designFormCard" style="margin-bottom:28px;">
           <h3 style="font-size:15px; margin-bottom:16px;" id="designFormTitle">Add a design</h3>
           <input type="hidden" id="designEditingId">
           <div class="form-row">
@@ -254,6 +256,45 @@
           </table>
         </div>
         <div id="messagesEmpty" class="empty-state" style="display:none; margin-top:16px;">No messages yet.</div>
+      </div>
+
+      <!-- STAFF (admin-only; hidden entirely for staff accounts) -->
+      <div class="admin-panel" id="tab-staff">
+        <p class="graphite-text" style="margin-bottom:20px;">Staff accounts can view and print orders, but can't edit or delete anything, and can't see Analytics, Cancelled/voided receipts, the job-order reset, or Garment reference photos. Only admins have full access.</p>
+
+        <div class="card" style="margin-bottom:28px;">
+          <h3 style="font-size:15px; margin-bottom:16px;">Add an account</h3>
+          <div id="staffCreateError" class="callout" style="display:none; margin-bottom:16px; border-color:var(--thread);"></div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="staffEmail">Email</label>
+              <input type="email" id="staffEmail" required>
+            </div>
+            <div class="form-field">
+              <label for="staffPassword">Temporary password</label>
+              <input type="text" id="staffPassword" placeholder="At least 6 characters" required>
+              <p class="graphite-text" style="font-size:11px; margin-top:6px;">Share this with them directly — there's no invite email. They can change it after signing in (via Supabase's password reset, or you can set a new one here later).</p>
+            </div>
+            <div class="form-field">
+              <label for="staffRole">Role</label>
+              <select id="staffRole">
+                <option value="staff">Staff — view & print only</option>
+                <option value="admin">Admin — full access</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" id="staffCreateBtn">Create account →</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Email</th><th>Role</th><th>Added</th><th></th></tr>
+            </thead>
+            <tbody id="staffBody"></tbody>
+          </table>
+        </div>
+        <div id="staffEmpty" class="empty-state" style="display:none; margin-top:16px;">No accounts yet.</div>
       </div>
 
     </div>
