@@ -123,8 +123,22 @@
               <label for="designColorway">Colourway (label shown under the title)</label>
               <input type="text" id="designColorway" placeholder="e.g. Black on Canvas" required>
             </div>
+          </div>
+          <div class="form-row">
             <div class="form-field">
-              <label for="designPrice">Price</label>
+              <label for="designGarment">Match to inventory garment</label>
+              <select id="designGarment">
+                <option value="">— custom price (not linked to inventory) —</option>
+              </select>
+            </div>
+            <div class="form-field" id="designMarkupField" style="display:none;">
+              <label for="designMarkup">Print / labour markup (added on top of garment price)</label>
+              <input type="number" id="designMarkup" min="0" step="0.01" value="0">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="designPrice">Price<span id="designPriceLinkedNote" class="graphite-text" style="display:none; font-weight:normal; font-size:12px;"> (from linked garment + markup)</span></label>
               <input type="number" id="designPrice" min="0" step="0.01" required>
             </div>
           </div>
@@ -151,7 +165,7 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Photo</th><th>Title</th><th>Category</th><th>Price</th><th>Artwork</th><th></th></tr>
+              <tr><th>Photo</th><th>Title</th><th>Category</th><th>Garment</th><th>Price</th><th>Artwork</th><th></th></tr>
             </thead>
             <tbody id="designsBody"></tbody>
           </table>

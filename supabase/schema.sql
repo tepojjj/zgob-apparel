@@ -14,7 +14,9 @@ create table if not exists public.designs (
   title       text not null,
   category    text not null,
   colorway    text not null,
-  price       numeric not null default 0,
+  price       numeric not null default 0,  -- snapshot of the last computed price; kept for designs with no linked garment
+  garment_id  text,  -- optional link to the blank garment this design is printed on (FK to inventory added below, once that table exists); when set, price = that garment's live inventory price + markup
+  markup      numeric not null default 0,  -- print/labour cost added on top of the linked garment's inventory price
   tags        text[] not null default '{}',
   swatch      text[] not null default '{}',
   image_url    text,  -- real photo of the finished garment/design, shown on the Designs page in place of the SVG sketch
@@ -25,6 +27,8 @@ create table if not exists public.designs (
 -- migration for projects that ran an earlier version of this schema before these columns existed:
 alter table public.designs add column if not exists image_url text;
 alter table public.designs add column if not exists artwork_url text;
+alter table public.designs add column if not exists garment_id text;
+alter table public.designs add column if not exists markup numeric not null default 0;
 
 create table if not exists public.inventory (
   id          text primary key,
@@ -34,6 +38,16 @@ create table if not exists public.inventory (
   sizes       jsonb not null default '{}',  -- e.g. {"S":42,"M":65,"L":58,"XL":21,"XXL":6}
   created_at  timestamptz not null default now()
 );
+
+-- now that inventory exists, link designs.garment_id -> inventory.id
+-- (deferred to here because designs is created before inventory above)
+do $$ begin
+  alter table public.designs
+    add constraint designs_garment_id_fkey
+    foreign key (garment_id) references public.inventory(id) on delete set null;
+exception when duplicate_object then null;
+end $$;
+create index if not exists designs_garment_id_idx on public.designs(garment_id);
 
 create table if not exists public.orders (
   id           uuid primary key default gen_random_uuid(),

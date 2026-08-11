@@ -3,6 +3,62 @@ document.addEventListener('DOMContentLoaded', async () => {
   const dashboardView = document.getElementById('dashboardView');
   const loginError = document.getElementById('loginError');
   let designsCache = []; // must be declared before the first render can run
+  let inventoryCache = []; // kept in sync so the design form can look up live garment prices
+
+  // design form fields — declared up here (rather than down near the rest of the
+  // designs code) because the very first dashboard render can populate/read them
+  // before execution would otherwise reach their old declaration point
+  let designPhotoFile = null;      // File picked but not yet uploaded
+  let designPhotoUrl = null;       // URL already on the row being edited (kept if no new file is picked)
+  let designArtworkFile = null;    // print-ready artwork File picked but not yet uploaded
+  let designArtworkUrl = null;     // print-ready artwork URL already on the row being edited
+
+  const designTitle = document.getElementById('designTitle');
+  const designCategory = document.getElementById('designCategory');
+  const designColorway = document.getElementById('designColorway');
+  const designGarment = document.getElementById('designGarment');
+  const designMarkupField = document.getElementById('designMarkupField');
+  const designMarkup = document.getElementById('designMarkup');
+  const designPrice = document.getElementById('designPrice');
+  const designPriceLinkedNote = document.getElementById('designPriceLinkedNote');
+  const designPhotoInput = document.getElementById('designPhoto');
+  const designPhotoName = document.getElementById('designPhotoName');
+  const designPhotoPreviewWrap = document.getElementById('designPhotoPreviewWrap');
+  const designPhotoPreview = document.getElementById('designPhotoPreview');
+  const designArtworkInput = document.getElementById('designArtwork');
+  const designArtworkName = document.getElementById('designArtworkName');
+  const designEditingId = document.getElementById('designEditingId');
+  const designFormTitle = document.getElementById('designFormTitle');
+  const designSaveBtn = document.getElementById('designSaveBtn');
+  const designCancelEditBtn = document.getElementById('designCancelEditBtn');
+
+  // rebuilds the "match to inventory garment" dropdown from the current inventory list,
+  // preserving whichever garment is currently selected (if it still exists)
+  function populateDesignGarmentOptions(){
+    const current = designGarment.value;
+    designGarment.innerHTML = '<option value="">— custom price (not linked to inventory) —</option>' +
+      inventoryCache.map(item => `<option value="${item.id}">${zgobEscape(item.name)} — ₱${Number(item.price).toFixed(2)}</option>`).join('');
+    if(current && inventoryCache.some(i => i.id === current)) designGarment.value = current;
+    updateDesignPriceFromGarment();
+  }
+
+  // when a garment is linked, the price field becomes a read-only computed value
+  // (garment's live inventory price + markup); when unlinked, it's a normal manual field
+  function updateDesignPriceFromGarment(){
+    const item = inventoryCache.find(i => i.id === designGarment.value);
+    if(item){
+      designMarkupField.style.display = 'block';
+      designPriceLinkedNote.style.display = 'inline';
+      designPrice.readOnly = true;
+      designPrice.value = (Number(item.price) + (Number(designMarkup.value) || 0)).toFixed(2);
+    }else{
+      designMarkupField.style.display = 'none';
+      designPriceLinkedNote.style.display = 'none';
+      designPrice.readOnly = false;
+    }
+  }
+  designGarment.addEventListener('change', updateDesignPriceFromGarment);
+  designMarkup.addEventListener('input', updateDesignPriceFromGarment);
 
   async function showDashboard(){
     loginView.style.display = 'none';
@@ -118,6 +174,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderInventory(inventory){
+    inventoryCache = inventory;
+    populateDesignGarmentOptions();
     const body = document.getElementById('inventoryBody');
     const sizeKeys = ['S','M','L','XL','XXL'];
 
@@ -149,32 +207,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /* ---------------- designs ---------------- */
-  let designPhotoFile = null;      // File picked but not yet uploaded
-  let designPhotoUrl = null;       // URL already on the row being edited (kept if no new file is picked)
-  let designArtworkFile = null;    // print-ready artwork File picked but not yet uploaded
-  let designArtworkUrl = null;     // print-ready artwork URL already on the row being edited
-
-  const designTitle = document.getElementById('designTitle');
-  const designCategory = document.getElementById('designCategory');
-  const designColorway = document.getElementById('designColorway');
-  const designPrice = document.getElementById('designPrice');
-  const designPhotoInput = document.getElementById('designPhoto');
-  const designPhotoName = document.getElementById('designPhotoName');
-  const designPhotoPreviewWrap = document.getElementById('designPhotoPreviewWrap');
-  const designPhotoPreview = document.getElementById('designPhotoPreview');
-  const designArtworkInput = document.getElementById('designArtwork');
-  const designArtworkName = document.getElementById('designArtworkName');
-  const designEditingId = document.getElementById('designEditingId');
-  const designFormTitle = document.getElementById('designFormTitle');
-  const designSaveBtn = document.getElementById('designSaveBtn');
-  const designCancelEditBtn = document.getElementById('designCancelEditBtn');
-
   function resetDesignForm(){
     designEditingId.value = '';
     designFormTitle.textContent = 'Add a design';
     designSaveBtn.textContent = 'Save design →';
     designCancelEditBtn.style.display = 'none';
     designTitle.value = ''; designCategory.value = ''; designColorway.value = ''; designPrice.value = '';
+    designGarment.value = ''; designMarkup.value = '0';
+    updateDesignPriceFromGarment();
     designPhotoInput.value = '';
     designPhotoFile = null; designPhotoUrl = null;
     designPhotoName.style.display = 'none'; designPhotoName.textContent = '';
@@ -228,7 +268,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const editingId = designEditingId.value;
-      const payload = { title, category, colorway, price, tags: category ? [category] : [], swatch: ['#ede6d6'], imageUrl, artworkUrl };
+      const payload = {
+        title, category, colorway, price,
+        garmentId: designGarment.value || null,
+        markup: Number(designMarkup.value) || 0,
+        tags: category ? [category] : [], swatch: ['#ede6d6'], imageUrl, artworkUrl
+      };
 
       if(editingId){
         await ZgobStore.updateDesign(editingId, payload);
@@ -254,14 +299,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const body = document.getElementById('designsBody');
     document.getElementById('designsEmpty').style.display = designs.length ? 'none' : 'block';
 
-    body.innerHTML = designs.map(d => `
+    body.innerHTML = designs.map(d => {
+      const garment = inventoryCache.find(i => i.id === d.garment_id);
+      // if linked, always show the live inventory price + markup rather than the stored snapshot,
+      // so this stays accurate even if the garment's inventory price changed after this design was saved
+      const displayPrice = garment ? (Number(garment.price) + Number(d.markup || 0)) : Number(d.price);
+      return `
       <tr>
         <td>${d.image_url
           ? `<img src="${d.image_url}" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:2px; border:1px solid var(--line);">`
           : `<span class="graphite-text" style="font-size:11px;">Sketch only</span>`}</td>
         <td><strong>${zgobEscape(d.title)}</strong></td>
         <td>${zgobEscape(d.category)}</td>
-        <td>₱${Number(d.price).toFixed(2)}</td>
+        <td>${garment ? zgobEscape(garment.name) : '<span class="graphite-text" style="font-size:12px;">— none —</span>'}</td>
+        <td>₱${displayPrice.toFixed(2)}</td>
         <td>${d.artwork_url
           ? `<span class="status status-ok">Ready to use</span>`
           : `<span class="status status-low">None — text only</span>`}</td>
@@ -270,7 +321,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <button class="icon-btn delete-design" data-id="${d.id}">Delete</button>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     body.querySelectorAll('.edit-design').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -283,7 +335,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         designTitle.value = d.title;
         designCategory.value = d.category;
         designColorway.value = d.colorway;
-        designPrice.value = d.price;
+        designGarment.value = d.garment_id || '';
+        designMarkup.value = d.markup || 0;
+        updateDesignPriceFromGarment();
+        if(!d.garment_id) designPrice.value = d.price;
         designPhotoFile = null;
         designPhotoUrl = d.image_url || null;
         designPhotoInput.value = '';

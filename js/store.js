@@ -29,13 +29,15 @@ const ZgobStore = (() => {
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
     async addDesign(design){
-      // design: { id, title, category, colorway, price, tags, swatch, imageUrl, artworkUrl }
+      // design: { id, title, category, colorway, price, garmentId, markup, tags, swatch, imageUrl, artworkUrl }
       const row = {
         id: design.id,
         title: design.title,
         category: design.category,
         colorway: design.colorway,
         price: design.price,
+        garment_id: design.garmentId || null,
+        markup: design.markup || 0,
         tags: design.tags || [],
         swatch: design.swatch || [],
         image_url: design.imageUrl || null,
@@ -49,6 +51,8 @@ const ZgobStore = (() => {
         category: design.category,
         colorway: design.colorway,
         price: design.price,
+        garment_id: design.garmentId || null,
+        markup: design.markup || 0,
         tags: design.tags || [],
         swatch: design.swatch || [],
         image_url: design.imageUrl || null,

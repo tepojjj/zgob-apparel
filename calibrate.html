@@ -78,6 +78,7 @@
           <label for="extraPrice">Extra price for this photo (optional)</label>
           <input type="number" id="extraPrice" min="0" step="0.01" value="0">
           <p class="graphite-text" style="font-size:11px; margin-top:6px;">Added on top of the garment's base price whenever a customer's preview uses this specific photo — e.g. for a pricier angle, fabric, or finish.</p>
+          <p style="font-size:12px; margin-top:8px; font-family:'Space Mono',monospace;">Customer will see: <strong id="extraPriceTotal">₱0.00</strong> <span class="graphite-text" id="extraPriceBreakdown"></span></p>
         </div>
 
         <div id="photoPreviewWrap">
@@ -115,6 +116,23 @@
   const garmentSelect = document.getElementById('garmentName');
   const formTitle = document.getElementById('formTitle');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const extraPriceTotal = document.getElementById('extraPriceTotal');
+  const extraPriceBreakdown = document.getElementById('extraPriceBreakdown');
+
+  let inventoryCache = [];
+
+  // shows the *actual total* a customer will see for the currently selected garment —
+  // base inventory price + this photo's surcharge — right next to the surcharge field,
+  // so it's obvious this isn't a standalone price
+  function updateExtraPriceTotal(){
+    const item = inventoryCache.find(i => i.name === garmentSelect.value);
+    const base = item ? Number(item.price) : 0;
+    const extra = Number(extraPriceInput.value) || 0;
+    extraPriceTotal.textContent = `₱${(base + extra).toFixed(2)}`;
+    extraPriceBreakdown.textContent = item ? `(₱${base.toFixed(2)} base + ₱${extra.toFixed(2)} extra)` : '(no matching inventory item — base counted as ₱0)';
+  }
+  extraPriceInput.addEventListener('input', updateExtraPriceTotal);
+  garmentSelect.addEventListener('change', updateExtraPriceTotal);
 
   const REFERENCE_COLOR = 'White'; // every reference photo is the same plain-white garment
   // fixed, generic centered print-area box (fraction of the photo's own width/height) —
@@ -149,6 +167,7 @@
     previewWrap.style.display = 'none';
     saveBtn.textContent = 'Save reference photo →';
     updateSaveButtonState();
+    updateExtraPriceTotal();
   }
 
   cancelEditBtn.addEventListener('click', () => { resetForm(); setStatus(''); });
@@ -259,6 +278,7 @@
                   <input type="number" min="0" step="0.01" class="price-input" data-id="${row.id}" value="${row.extra_price || 0}">
                   <button class="icon-btn save-price" data-id="${row.id}">Save price</button>
                 </div>
+                <p class="graphite-text" style="font-size:11px; margin-top:4px;">Customer sees: ₱${(( (inventoryCache.find(i=>i.name===garment)||{}).price || 0) + Number(row.extra_price || 0)).toFixed(2)} total</p>
                 <div class="ref-card-actions">
                   <button class="icon-btn edit-ref" data-id="${row.id}" data-garment="${garment}" data-price="${row.extra_price || 0}" data-url="${row.image_url}">Edit</button>
                   <button class="icon-btn delete-ref" data-id="${row.id}">Delete</button>
@@ -277,6 +297,14 @@
           if(editingId === btn.dataset.id) resetForm();
           renderGroups();
         }
+      });
+    });
+    groupsEl.querySelectorAll('.price-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const note = input.closest('.ref-card-body').querySelector('p.graphite-text');
+        const garment = input.closest('.ref-card-body').querySelector('.edit-ref')?.dataset.garment;
+        const base = (inventoryCache.find(i => i.name === garment) || {}).price || 0;
+        if(note) note.textContent = `Customer sees: ₱${(Number(base) + (Number(input.value) || 0)).toFixed(2)} total`;
       });
     });
     groupsEl.querySelectorAll('.save-price').forEach(btn => {
@@ -311,6 +339,7 @@
         previewWrap.style.display = 'block';
         saveBtn.textContent = 'Save changes →';
         updateSaveButtonState();
+        updateExtraPriceTotal();
         setStatus('');
         window.scrollTo({ top: document.querySelector('.ref-wrap').getBoundingClientRect().top + window.scrollY - 100, behavior: 'smooth' });
       });
@@ -318,6 +347,7 @@
   }
 
   renderGroups();
+  ZgobStore.getInventory().then(inv => { inventoryCache = inv; updateExtraPriceTotal(); renderGroups(); }).catch(err => console.error('Failed to load inventory for price preview:', err));
 })();
 </script>
 </body>
