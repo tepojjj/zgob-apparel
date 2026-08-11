@@ -59,10 +59,6 @@ const ZgobStore = (() => {
     async deleteDesign(id){
       orThrow(await client.from('designs').delete().eq('id', id));
     },
-    /** Update just the price on a design row — used by the inline price editor in the admin designs table. */
-    async updateDesignPrice(id, price){
-      return orThrow(await client.from('designs').update({ price: Number(price) || 0 }).eq('id', id).select().single());
-    },
 
     /* ---------------- inventory ---------------- */
     async getInventory(){
@@ -148,6 +144,18 @@ const ZgobStore = (() => {
       return orThrow(await client.from('garment_photos')
         .insert({ garment, color: color || 'White', image_url: imageUrl, quad: quad || null, extra_price: extraPrice || 0 })
         .select().single());
+    },
+    /** Update an existing reference photo — garment, price, and/or the photo itself (pass a new
+        imageUrl + quad to replace it, or omit them to leave the current photo as-is and just change garment/price). */
+    async updateGarmentPhoto(id, { garment, imageUrl, quad, extraPrice }){
+      const patch = {};
+      if(garment !== undefined) patch.garment = garment;
+      if(imageUrl !== undefined) patch.image_url = imageUrl;
+      if(quad !== undefined) patch.quad = quad;
+      if(extraPrice !== undefined) patch.extra_price = extraPrice || 0;
+      return orThrow(await client.from('garment_photos')
+        .update(patch)
+        .eq('id', id).select().single());
     },
     /** Update just the surcharge on an existing reference photo. */
     async updateGarmentPhotoPrice(id, extraPrice){

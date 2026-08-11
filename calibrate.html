@@ -12,17 +12,17 @@
   .ref-wrap{ display:grid; grid-template-columns: 1fr 1.3fr; gap: 30px; align-items:start; }
   @media (max-width: 900px){ .ref-wrap{ grid-template-columns: 1fr; } }
   .ref-group{ margin-bottom: 26px; }
-  .ref-group h4{ font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--graphite); margin-bottom:10px; }
+  .ref-group h4{ font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--graphite-2); margin-bottom:10px; }
   .ref-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:14px; }
-  .ref-card{ border:1px solid var(--line); border-radius:2px; overflow:hidden; background:var(--ink-2); }
+  .ref-card{ border:1px solid var(--line-dark); border-radius:2px; overflow:hidden; background:var(--chalk); }
   .ref-card img{ width:100%; aspect-ratio:1; object-fit:cover; display:block; background:#fff; }
   .ref-card-body{ padding:10px 12px; }
-  .ref-card-body span{ font-family:'Space Mono',monospace; font-size:11px; color:var(--graphite); text-transform:uppercase; }
+  .ref-card-body span{ font-family:'Space Mono',monospace; font-size:11px; color:var(--graphite-2); text-transform:uppercase; }
   .ref-price-row{ display:flex; gap:6px; margin-top:8px; align-items:center; }
   .ref-price-row input{ width:70px; padding:6px 8px; font-size:12px; }
   .ref-card-actions{ display:flex; gap:8px; margin-top:8px; }
   #photoPreviewWrap{ display:none; margin-top:14px; }
-  #photoPreviewWrap img{ width:100%; max-height:280px; object-fit:contain; border:1px solid var(--line); border-radius:2px; display:block; background:#fff; }
+  #photoPreviewWrap img{ width:100%; max-height:280px; object-fit:contain; border:1px solid var(--line-dark); border-radius:2px; display:block; background:#fff; }
 </style>
 </head>
 <body>
@@ -45,11 +45,14 @@
     </div>
   </section>
 
-  <section class="section-dark" style="padding-top:40px;">
+  <section class="section-light" style="padding-top:40px;">
     <div class="wrap ref-wrap">
 
       <div class="card">
-        <h3 style="font-size:15px; margin-bottom:14px;">Add a reference photo</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h3 style="font-size:15px; margin:0;" id="formTitle">Add a reference photo</h3>
+          <button type="button" id="cancelEditBtn" class="icon-btn" style="display:none;">Cancel edit</button>
+        </div>
         <div class="form-field" style="margin-bottom:0;">
           <label for="garmentName">Garment</label>
           <select id="garmentName">
@@ -67,7 +70,7 @@
         </div>
 
         <div class="form-field" style="margin-top:16px;">
-          <label for="photoFile">Photo (plain white garment)</label>
+          <label for="photoFile" id="photoFileLabel">Photo (plain white garment)</label>
           <input type="file" id="photoFile" accept="image/*">
         </div>
 
@@ -101,6 +104,7 @@
 <script>
 (async () => {
   const photoFile = document.getElementById('photoFile');
+  const photoFileLabel = document.getElementById('photoFileLabel');
   const extraPriceInput = document.getElementById('extraPrice');
   const previewWrap = document.getElementById('photoPreviewWrap');
   const previewImg = document.getElementById('photoPreviewImg');
@@ -109,6 +113,8 @@
   const groupsEl = document.getElementById('refGroups');
   const emptyEl = document.getElementById('refEmpty');
   const garmentSelect = document.getElementById('garmentName');
+  const formTitle = document.getElementById('formTitle');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
 
   const REFERENCE_COLOR = 'White'; // every reference photo is the same plain-white garment
   // fixed, generic centered print-area box (fraction of the photo's own width/height) —
@@ -117,6 +123,7 @@
 
   let pickedFile = null;
   let naturalWidth = 0, naturalHeight = 0;
+  let editingId = null; // set while editing an existing reference photo instead of adding a new one
 
   function setStatus(msg, isError){
     statusEl.style.display = msg ? 'block' : 'none';
@@ -124,12 +131,40 @@
     statusEl.style.color = isError ? 'var(--thread)' : '';
   }
 
+  function updateSaveButtonState(){
+    // adding a new photo requires a file; editing an existing one doesn't (you can just change the garment/price)
+    saveBtn.disabled = editingId ? false : !pickedFile;
+  }
+
+  function resetForm(){
+    editingId = null;
+    formTitle.textContent = 'Add a reference photo';
+    cancelEditBtn.style.display = 'none';
+    photoFileLabel.textContent = 'Photo (plain white garment)';
+    garmentSelect.value = 'Classic Tee';
+    extraPriceInput.value = '0';
+    photoFile.value = '';
+    pickedFile = null;
+    naturalWidth = 0; naturalHeight = 0;
+    previewWrap.style.display = 'none';
+    saveBtn.textContent = 'Save reference photo →';
+    updateSaveButtonState();
+  }
+
+  cancelEditBtn.addEventListener('click', () => { resetForm(); setStatus(''); });
+
   photoFile.addEventListener('change', () => {
     pickedFile = photoFile.files[0] || null;
     setStatus('');
     if(!pickedFile){
-      previewWrap.style.display = 'none';
-      saveBtn.disabled = true;
+      // in edit mode, no new file just means "keep the current photo" — show it again instead of hiding the preview
+      if(editingId && previewImg.dataset.existingUrl){
+        previewImg.src = previewImg.dataset.existingUrl;
+        previewWrap.style.display = 'block';
+      }else{
+        previewWrap.style.display = 'none';
+      }
+      updateSaveButtonState();
       return;
     }
     const objectUrl = URL.createObjectURL(pickedFile);
@@ -139,13 +174,36 @@
       naturalHeight = img.naturalHeight;
       previewImg.src = objectUrl;
       previewWrap.style.display = 'block';
-      saveBtn.disabled = false;
+      updateSaveButtonState();
     };
     img.onerror = () => setStatus('Could not load that image.', true);
     img.src = objectUrl;
   });
 
   saveBtn.addEventListener('click', async () => {
+    if(editingId){
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      setStatus('');
+      try{
+        const patch = { garment: garmentSelect.value, extraPrice: Number(extraPriceInput.value) || 0 };
+        if(pickedFile && naturalWidth){
+          patch.imageUrl = await ZgobStore.uploadGarmentPhoto(pickedFile);
+          patch.quad = AUTO_QUAD_FRACTION.map(([fx, fy]) => [fx * naturalWidth, fy * naturalHeight]);
+        }
+        await ZgobStore.updateGarmentPhoto(editingId, patch);
+        setStatus('Saved changes.');
+        resetForm();
+        renderGroups();
+      }catch(err){
+        setStatus('Something went wrong saving that change: ' + err.message, true);
+        console.error(err);
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save changes →';
+      }
+      return;
+    }
+
     if(!pickedFile || !naturalWidth) return;
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
@@ -161,17 +219,12 @@
         extraPrice: Number(extraPriceInput.value) || 0
       });
       setStatus(`Saved — ${garmentSelect.value} now has a new reference photo on Customize.`);
-      photoFile.value = '';
-      pickedFile = null;
-      naturalWidth = 0; naturalHeight = 0;
-      extraPriceInput.value = '0';
-      previewWrap.style.display = 'none';
+      resetForm();
       renderGroups();
     }catch(err){
       setStatus('Something went wrong saving that photo: ' + err.message, true);
       console.error(err);
-    }finally{
-      saveBtn.disabled = !pickedFile;
+      saveBtn.disabled = false;
       saveBtn.textContent = 'Save reference photo →';
     }
   });
@@ -207,6 +260,7 @@
                   <button class="icon-btn save-price" data-id="${row.id}">Save price</button>
                 </div>
                 <div class="ref-card-actions">
+                  <button class="icon-btn edit-ref" data-id="${row.id}" data-garment="${garment}" data-price="${row.extra_price || 0}" data-url="${row.image_url}">Edit</button>
                   <button class="icon-btn delete-ref" data-id="${row.id}">Delete</button>
                 </div>
               </div>
@@ -220,6 +274,7 @@
       btn.addEventListener('click', async () => {
         if(confirm('Delete this reference photo?')){
           await ZgobStore.deleteGarmentPhoto(btn.dataset.id);
+          if(editingId === btn.dataset.id) resetForm();
           renderGroups();
         }
       });
@@ -238,6 +293,26 @@
           btn.disabled = false;
           alert('Could not save that price: ' + err.message);
         }
+      });
+    });
+    groupsEl.querySelectorAll('.edit-ref').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editingId = btn.dataset.id;
+        formTitle.textContent = `Editing reference photo — ${btn.dataset.garment}`;
+        cancelEditBtn.style.display = '';
+        photoFileLabel.textContent = 'Replace photo (optional — leave empty to keep the current one)';
+        garmentSelect.value = btn.dataset.garment;
+        extraPriceInput.value = btn.dataset.price;
+        photoFile.value = '';
+        pickedFile = null;
+        naturalWidth = 0; naturalHeight = 0;
+        previewImg.dataset.existingUrl = btn.dataset.url;
+        previewImg.src = btn.dataset.url;
+        previewWrap.style.display = 'block';
+        saveBtn.textContent = 'Save changes →';
+        updateSaveButtonState();
+        setStatus('');
+        window.scrollTo({ top: document.querySelector('.ref-wrap').getBoundingClientRect().top + window.scrollY - 100, behavior: 'smooth' });
       });
     });
   }

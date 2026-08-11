@@ -8,15 +8,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
 :root{
-  --ink:      #14120d;   /* primary dark surface */
-  --ink-2:    #1e1b14;   /* slightly lifted dark surface */
+  --ink:      #2b2620;   /* primary dark surface — softened charcoal, not near-black */
+  --ink-2:    #363026;   /* slightly lifted dark surface */
   --canvas:   #ede6d6;   /* raw cotton canvas, light surface */
   --chalk:    #f7f3e8;   /* lightest surface / text-on-dark */
   --thread:   #d6432a;   /* registration red — primary accent / CTA */
   --thread-dark: #ab331f;
   --denim:    #3e5c74;   /* secondary accent */
   --mustard:  #d4a017;   /* tag / warning accent */
-  --graphite: #8a8474;   /* muted text on dark */
+  --graphite: #a39d8c;   /* muted text on dark */
   --graphite-2: #6b6656; /* muted text on light */
   --line:     rgba(237,230,214,0.16);
   --line-dark:rgba(20,18,13,0.14);
@@ -33,8 +33,8 @@
 html{ scroll-behavior: smooth; }
 body{
   margin:0;
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--canvas);
+  color: var(--ink);
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.55;
@@ -368,6 +368,26 @@ section{ padding: 88px 0; }
 .card .card-icon{ width:40px; height:40px; color: var(--thread); margin-bottom: 18px; }
 .section-light .card{ background: var(--chalk); border-color: var(--line-dark); }
 
+/* ---------- services (overview page) ---------- */
+.service-card{
+  border: 1px solid var(--line-dark);
+  background: var(--chalk);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.service-card:hover{ border-color: var(--thread); transform: translateY(-3px); }
+.service-card .service-icon{ font-size: 26px; display:block; margin-bottom: 14px; }
+.service-card h3{ font-size: 17px; margin-bottom: 8px; }
+.service-card .service-desc{ color: var(--graphite-2); font-size: 14px; margin-bottom: 16px; }
+.service-offerings{ display:flex; flex-wrap:wrap; gap:7px; }
+.offering-chip{
+  font-family: var(--font-mono); font-size: 10.5px; text-transform:uppercase; letter-spacing:.02em;
+  padding: 5px 9px; border: 1px solid var(--line-dark); border-radius: var(--radius); color: var(--graphite-2);
+}
+.service-for{ margin-top: 16px; font-size: 12.5px; color: var(--graphite-2); }
+.service-for strong{ color: var(--ink); }
+
 /* hang-tag style product card */
 .tag-card{
   position:relative;
@@ -468,6 +488,23 @@ tr:last-child td{ border-bottom:none; }
 .section-light .table-wrap{ border-color: var(--line-dark); }
 .section-light th{ background: rgba(20,18,13,0.04); color: var(--graphite-2); border-color: var(--line-dark); }
 .section-light td{ border-color: var(--line-dark); }
+
+/* everything below fills in "on light" versions of components that were originally styled with a
+   dark section in mind — needed now that most content sections default to the light surface. */
+.section-light .btn:not(.btn-primary):not(.btn-danger){ border-color: var(--ink); color: var(--ink); }
+.section-light .icon-btn{ border-color: var(--line-dark); color: var(--ink); }
+.section-light .icon-btn:hover{ border-color: var(--thread); color: var(--thread); }
+.section-light .admin-tab{ color: var(--graphite-2); }
+.section-light .admin-tab.active{ color: var(--ink); }
+.section-light .stat-box{ background: var(--chalk); border-color: var(--line-dark); }
+.section-light .empty-state{ border-color: var(--line-dark); color: var(--graphite-2); }
+.section-light .print-area-hint{ color: var(--graphite-2); }
+.section-light .artwork-filename{ color: var(--ink); }
+.section-light .status-new{ background: rgba(214,67,42,.12); color: var(--thread-dark); }
+.section-light .status-progress{ background: rgba(212,160,23,.18); color: #8a6a10; }
+.section-light .status-done{ background: rgba(62,92,116,.14); color: var(--denim); }
+.section-light .status-low{ background: rgba(214,67,42,.12); color: var(--thread-dark); }
+.section-light .status-ok{ background: rgba(90,160,90,.18); color: #3f7a3f; }
 
 /* ---------- admin ---------- */
 .admin-shell{ min-height: 60vh; }
