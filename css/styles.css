@@ -146,9 +146,9 @@ p{ margin: 0 0 1em 0; }
 /* ---------- header / nav ---------- */
 .site-header{
   position: sticky; top:0; z-index: 50;
-  background: rgba(20,18,13,0.92);
+  background: rgba(255,255,255,0.94);
   backdrop-filter: blur(6px);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-dark);
 }
 .nav{
   display:flex; align-items:center; justify-content:space-between;
@@ -160,7 +160,7 @@ p{ margin: 0 0 1em 0; }
   font-size: 20px;
   letter-spacing: 0.02em;
   text-decoration:none;
-  color: var(--canvas);
+  color: var(--ink);
   display:flex; align-items:center; gap:10px;
 }
 .logo img{
@@ -178,33 +178,33 @@ p{ margin: 0 0 1em 0; }
 }
 .nav-links a{
   text-decoration:none;
-  color: var(--graphite);
+  color: var(--graphite-2);
   padding: 10px 14px;
   display:block;
   border-radius: var(--radius);
   transition: color .15s ease, background .15s ease;
 }
-.nav-links a:hover{ color: var(--canvas); }
-.nav-links a.active{ color: var(--ink); background: var(--canvas); }
+.nav-links a:hover{ color: var(--ink); }
+.nav-links a.active{ color: var(--chalk); background: var(--ink); }
 .nav-toggle{ display:none; }
 
 @media (max-width: 820px){
   .nav-links{
     position:fixed; inset: 66px 0 0 0; height:auto;
-    flex-direction:column; background: var(--ink);
+    flex-direction:column; background: var(--chalk);
     padding: 10px 20px 30px; gap:2px;
     transform: translateY(-8px);
     opacity:0; pointer-events:none;
     transition: opacity .18s ease, transform .18s ease;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-dark);
   }
   .nav-links.open{ opacity:1; pointer-events:auto; transform:translateY(0); }
-  .nav-links a{ padding: 14px 10px; border-bottom: 1px dashed var(--line); }
+  .nav-links a{ padding: 14px 10px; border-bottom: 1px dashed var(--line-dark); }
   .nav-toggle{
     display:flex; flex-direction:column; gap:5px;
     background:none; border:none; cursor:pointer; padding: 6px;
   }
-  .nav-toggle span{ width:22px; height:2px; background:var(--canvas); display:block; }
+  .nav-toggle span{ width:22px; height:2px; background:var(--ink); display:block; }
 }
 
 /* ---------- sections ---------- */
