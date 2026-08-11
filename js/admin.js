@@ -539,10 +539,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   /* ---------------- analytics ---------------- */
 
+  // Revenue only counts orders that are actually being worked (in progress) or completed
+  // (fulfilled) — a new order isn't confirmed revenue yet, and a cancelled one never
+  // becomes revenue at all.
+  function orderCountsTowardRevenue(order){
+    return order.status === 'progress' || order.status === 'done';
+  }
+
   // The order's revenue: use the price captured at order time if we have it (unit_price/
   // total_price were added after launch), otherwise fall back to estimating from the
   // garment's current inventory price — flagged so the dashboard can disclose the estimate.
   function getOrderRevenue(order, inventory){
+    if(!orderCountsTowardRevenue(order)) return { amount: 0, estimated: false };
     if(order.total_price != null) return { amount: Number(order.total_price), estimated: false };
     const item = inventory.find(i => i.name === order.garment);
     const price = item ? Number(item.price) : 0;
@@ -691,7 +699,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderAnalytics(orders, inventory){
     const filtered = filterOrdersByRange(orders, currentAnalyticsRange);
 
-    let revenue = 0, units = 0, estimatedUsed = false;
+    let revenue = 0, units = 0, estimatedUsed = false, revenueOrderCount = 0;
     const statusCounts = { new: 0, progress: 0, done: 0, cancelled: 0 };
     const garmentStats = {};
 
@@ -699,6 +707,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const { amount, estimated } = getOrderRevenue(o, inventory);
       revenue += amount;
       if(estimated) estimatedUsed = true;
+      if(orderCountsTowardRevenue(o)) revenueOrderCount += 1;
       units += Number(o.quantity) || 0;
       statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
       if(!garmentStats[o.garment]) garmentStats[o.garment] = { orders: 0, units: 0, revenue: 0 };
@@ -709,7 +718,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('statRevenue').textContent = `₱${revenue.toFixed(2)}`;
     document.getElementById('statOrderCount').textContent = filtered.length;
-    document.getElementById('statAvgOrder').textContent = `₱${(filtered.length ? revenue / filtered.length : 0).toFixed(2)}`;
+    document.getElementById('statAvgOrder').textContent = `₱${(revenueOrderCount ? revenue / revenueOrderCount : 0).toFixed(2)}`;
     document.getElementById('statUnitsSold').textContent = units;
     document.getElementById('analyticsEstimateNote').style.display = estimatedUsed ? 'block' : 'none';
 
