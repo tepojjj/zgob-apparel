@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     analyticsOrders = orders;
     analyticsInventory = inventory;
     renderStats(orders, inventory, messages);
-    renderOrders(orders);
+    renderOrders(orders, inventory);
     renderAnalytics(orders, inventory);
     renderInventory(inventory);
     renderDesigns(designs);
@@ -141,11 +141,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('statUnread').textContent = messages.filter(m => !m.read).length;
   }
 
-  function renderOrders(orders){
+  function renderOrders(orders, inventory){
     const body = document.getElementById('ordersBody');
     document.getElementById('ordersEmpty').style.display = orders.length ? 'none' : 'block';
 
-    body.innerHTML = orders.map(o => `
+    body.innerHTML = orders.map(o => {
+      const { amount: price, estimated } = getOrderRevenue(o, inventory);
+      const unit = o.unit_price != null ? Number(o.unit_price) : (o.quantity ? price / o.quantity : 0);
+      return `
       <tr>
         <td>${zgobFormatDate(o.created_at)}</td>
         <td>
@@ -155,11 +158,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>
           <div>${zgobEscape(o.garment)} · ${zgobEscape(o.color)}</div>
           ${o.design_text ? `<div class="graphite-text" style="font-size:12px;">"${zgobEscape(o.design_text)}"</div>` : ''}
+          ${o.notes ? `<div class="graphite-text" style="font-size:12px;">Note: ${zgobEscape(o.notes)}</div>` : ''}
           ${o.artwork_url ? `<div style="font-size:12px;"><a href="${o.artwork_url}" target="_blank" rel="noopener" style="color:var(--thread);">View artwork ↗</a></div>` : ''}
           ${o.reference_mockup_url ? `<div style="font-size:12px;"><a href="${o.reference_mockup_url}" target="_blank" rel="noopener" style="color:var(--thread);">View their mockup ↗</a></div>` : ''}
         </td>
         <td>${o.size} / ${o.quantity}</td>
         <td>${zgobEscape(o.placement || '—')}</td>
+        <td>
+          <div>₱${price.toFixed(2)}</div>
+          <div class="graphite-text" style="font-size:12px;">₱${unit.toFixed(2)} × ${o.quantity}${estimated ? ' · est.' : ''}</div>
+        </td>
         <td>
           <select class="order-status" data-id="${o.id}" style="font-family:'Space Mono',monospace; font-size:12px; background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px; padding:6px 8px;">
             <option value="new" ${o.status==='new'?'selected':''}>New</option>
@@ -169,7 +177,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         </td>
         <td><button class="icon-btn delete-order" data-id="${o.id}">Delete</button></td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     body.querySelectorAll('.order-status').forEach(sel => {
       sel.addEventListener('change', async () => {
