@@ -65,6 +65,7 @@ create table if not exists public.orders (
   status       text not null default 'new' check (status in ('new','progress','done')),
   unit_price   numeric,  -- price per item at the moment the order was placed (nullable: orders placed before this column existed won't have it)
   total_price  numeric,  -- unit_price * quantity, captured at order time so later price/inventory edits don't rewrite past sales history
+  order_group_id uuid,   -- shared by every size line submitted together on one order form, so the admin panel can show them as a single job order (nullable: rows placed before this column existed won't have it)
   created_at   timestamptz not null default now()
 );
 
@@ -72,6 +73,7 @@ create table if not exists public.orders (
 alter table public.orders add column if not exists reference_mockup_url text;
 alter table public.orders add column if not exists unit_price numeric;
 alter table public.orders add column if not exists total_price numeric;
+alter table public.orders add column if not exists order_group_id uuid;
 
 create table if not exists public.messages (
   id          uuid primary key default gen_random_uuid(),

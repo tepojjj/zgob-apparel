@@ -93,7 +93,7 @@ const ZgobStore = (() => {
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
     async addOrder(order){
-      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, referenceMockupUrl, notes, unitPrice, totalPrice }
+      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, referenceMockupUrl, notes, unitPrice, totalPrice, orderGroupId }
       const row = {
         name: order.name,
         email: order.email,
@@ -107,7 +107,10 @@ const ZgobStore = (() => {
         reference_mockup_url: order.referenceMockupUrl || null,
         notes: order.notes || null,
         unit_price: order.unitPrice ?? null,
-        total_price: order.totalPrice ?? null
+        total_price: order.totalPrice ?? null,
+        // shared across every size line from the same submission, so the admin panel
+        // can regroup them into a single job order / receipt
+        order_group_id: order.orderGroupId || null
       };
       // Anonymous visitors can INSERT here (RLS: "anyone can submit an order")
       // but cannot SELECT rows back (that's admin-only). Chaining .select()

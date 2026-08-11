@@ -141,60 +141,247 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('statUnread').textContent = messages.filter(m => !m.read).length;
   }
 
+  // A customer submits one order form but each size/quantity they entered is stored as
+  // its own row (see customize.html). Rows from the same submission share an
+  // order_group_id (see js/store.js addOrder). Older rows placed before that column
+  // existed don't have one, so as a fallback we regroup them by name + email + the
+  // "Part of a multi-size order: …" note customize.html already wrote identically onto
+  // every row of that submission. Anything left over is treated as its own single-line
+  // job order.
+  function orderGroupKey(o){
+    if(o.order_group_id) return 'g:' + o.order_group_id;
+    if(o.notes && /multi-size order/i.test(o.notes)) return 'legacy:' + o.name + '|' + o.email + '|' + o.notes;
+    return 'single:' + o.id;
+  }
+
+  function groupOrderRows(orders){
+    const map = new Map();
+    orders.forEach(o => {
+      const key = orderGroupKey(o);
+      if(!map.has(key)) map.set(key, []);
+      map.get(key).push(o);
+    });
+    return Array.from(map.values());
+  }
+
+  // Per-line unit/total price, falling back to the garment's current inventory price
+  // (flagged as estimated) for rows placed before unit_price/total_price were tracked.
+  function getLineAmounts(o, inventory){
+    if(o.unit_price != null || o.total_price != null){
+      const total = o.total_price != null ? Number(o.total_price) : Number(o.unit_price) * (Number(o.quantity) || 0);
+      const unit = o.unit_price != null ? Number(o.unit_price) : (o.quantity ? total / o.quantity : 0);
+      return { unit, total, estimated: false };
+    }
+    const item = inventory.find(i => i.name === o.garment);
+    const unit = item ? Number(item.price) : 0;
+    return { unit, total: unit * (Number(o.quantity) || 0), estimated: true };
+  }
+
+  let orderGroupsCache = [];
+
   function renderOrders(orders, inventory){
     const body = document.getElementById('ordersBody');
     document.getElementById('ordersEmpty').style.display = orders.length ? 'none' : 'block';
 
-    body.innerHTML = orders.map(o => {
-      const { amount: price, estimated } = getOrderRevenue(o, inventory);
-      const unit = o.unit_price != null ? Number(o.unit_price) : (o.quantity ? price / o.quantity : 0);
+    const groups = groupOrderRows(orders);
+    orderGroupsCache = groups;
+
+    body.innerHTML = groups.map((group, gi) => {
+      const primary = group[0];
+      const key = primary.id; // unique per group — first row's id
+      const lines = group.map(o => Object.assign({}, o, getLineAmounts(o, inventory)));
+      const totalQty = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+      const groupTotal = lines.reduce((s, l) => s + l.total, 0);
+      const anyEstimated = lines.some(l => l.estimated);
+      const sizesSummary = lines.map(l => `${l.size} ×${l.quantity}`).join(', ');
+      const ids = group.map(o => o.id).join(',');
+
+      const detailRows = lines.map(l => `
+        <tr>
+          <td style="padding-left:26px;">${zgobEscape(l.size)}</td>
+          <td>${l.quantity}</td>
+          <td>₱${l.unit.toFixed(2)}</td>
+          <td>₱${l.total.toFixed(2)}${l.estimated ? ' · est.' : ''}</td>
+        </tr>
+      `).join('');
+
       return `
       <tr>
-        <td>${zgobFormatDate(o.created_at)}</td>
+        <td>${zgobFormatDate(primary.created_at)}</td>
         <td>
-          <div>${zgobEscape(o.name)}</div>
-          <div class="graphite-text" style="font-size:12px;">${zgobEscape(o.email)}</div>
+          <div>${zgobEscape(primary.name)}</div>
+          <div class="graphite-text" style="font-size:12px;">${zgobEscape(primary.email)}</div>
         </td>
         <td>
-          <div>${zgobEscape(o.garment)} · ${zgobEscape(o.color)}</div>
-          ${o.design_text ? `<div class="graphite-text" style="font-size:12px;">"${zgobEscape(o.design_text)}"</div>` : ''}
-          ${o.notes ? `<div class="graphite-text" style="font-size:12px;">Note: ${zgobEscape(o.notes)}</div>` : ''}
-          ${o.artwork_url ? `<div style="font-size:12px;"><a href="${o.artwork_url}" target="_blank" rel="noopener" style="color:var(--thread);">View artwork ↗</a></div>` : ''}
-          ${o.reference_mockup_url ? `<div style="font-size:12px;"><a href="${o.reference_mockup_url}" target="_blank" rel="noopener" style="color:var(--thread);">View their mockup ↗</a></div>` : ''}
-        </td>
-        <td>${o.size} / ${o.quantity}</td>
-        <td>${zgobEscape(o.placement || '—')}</td>
-        <td>
-          <div>₱${price.toFixed(2)}</div>
-          <div class="graphite-text" style="font-size:12px;">₱${unit.toFixed(2)} × ${o.quantity}${estimated ? ' · est.' : ''}</div>
+          <div>${zgobEscape(primary.garment)} · ${zgobEscape(primary.color)}</div>
+          ${primary.design_text ? `<div class="graphite-text" style="font-size:12px;">"${zgobEscape(primary.design_text)}"</div>` : ''}
+          ${primary.notes ? `<div class="graphite-text" style="font-size:12px;">Note: ${zgobEscape(primary.notes)}</div>` : ''}
+          ${primary.artwork_url ? `<div style="font-size:12px;"><a href="${primary.artwork_url}" target="_blank" rel="noopener" style="color:var(--thread);">View artwork ↗</a></div>` : ''}
+          ${primary.reference_mockup_url ? `<div style="font-size:12px;"><a href="${primary.reference_mockup_url}" target="_blank" rel="noopener" style="color:var(--thread);">View their mockup ↗</a></div>` : ''}
         </td>
         <td>
-          <select class="order-status" data-id="${o.id}" style="font-family:'Space Mono',monospace; font-size:12px; background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px; padding:6px 8px;">
-            <option value="new" ${o.status==='new'?'selected':''}>New</option>
-            <option value="progress" ${o.status==='progress'?'selected':''}>In progress</option>
-            <option value="done" ${o.status==='done'?'selected':''}>Fulfilled</option>
+          <div>${zgobEscape(sizesSummary)}</div>
+          <div class="graphite-text" style="font-size:12px;">${totalQty} total</div>
+        </td>
+        <td>${zgobEscape(primary.placement || '—')}</td>
+        <td>
+          <div>₱${groupTotal.toFixed(2)}</div>
+          <div class="graphite-text" style="font-size:12px;">${lines.length} line${lines.length > 1 ? 's' : ''}${anyEstimated ? ' · est.' : ''}</div>
+        </td>
+        <td>
+          <select class="order-status" data-ids="${ids}" style="font-family:'Space Mono',monospace; font-size:12px; background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px; padding:6px 8px;">
+            <option value="new" ${primary.status==='new'?'selected':''}>New</option>
+            <option value="progress" ${primary.status==='progress'?'selected':''}>In progress</option>
+            <option value="done" ${primary.status==='done'?'selected':''}>Fulfilled</option>
           </select>
         </td>
-        <td><button class="icon-btn delete-order" data-id="${o.id}">Delete</button></td>
+        <td style="display:flex; flex-direction:column; gap:6px;">
+          <button class="icon-btn toggle-order-details" data-key="${key}">Details</button>
+          <button class="icon-btn print-order-receipt" data-key="${key}">Receipt</button>
+          <button class="icon-btn delete-order" data-ids="${ids}">Delete</button>
+        </td>
+      </tr>
+      <tr class="order-detail-row" id="order-detail-${key}" style="display:none;">
+        <td colspan="8" style="background:var(--ink-2);">
+          <div style="font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--graphite); margin:6px 0 8px 26px;">Full order breakdown</div>
+          <table style="width:100%;">
+            <thead>
+              <tr>
+                <th style="padding-left:26px;">Size</th><th>Qty</th><th>Unit price</th><th>Line total</th>
+              </tr>
+            </thead>
+            <tbody>${detailRows}</tbody>
+            <tfoot>
+              <tr>
+                <td style="padding-left:26px;" colspan="3"><strong>Total amount</strong></td>
+                <td><strong>₱${groupTotal.toFixed(2)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </td>
       </tr>
     `;
     }).join('');
 
+    body.querySelectorAll('.toggle-order-details').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = document.getElementById('order-detail-' + btn.dataset.key);
+        const showing = row.style.display !== 'none';
+        row.style.display = showing ? 'none' : 'table-row';
+        btn.textContent = showing ? 'Details' : 'Hide details';
+      });
+    });
+    body.querySelectorAll('.print-order-receipt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const group = orderGroupsCache.find(g => g[0].id === btn.dataset.key);
+        if(group) printJobOrderReceipt(group, inventory);
+      });
+    });
     body.querySelectorAll('.order-status').forEach(sel => {
       sel.addEventListener('change', async () => {
-        await ZgobStore.setOrderStatus(sel.dataset.id, sel.value);
+        const ids = sel.dataset.ids.split(',');
+        await Promise.all(ids.map(id => ZgobStore.setOrderStatus(id, sel.value)));
         zgobToast('Order status updated.');
         renderAll();
       });
     });
     body.querySelectorAll('.delete-order').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if(confirm('Remove this order? This cannot be undone.')){
-          await ZgobStore.deleteOrder(btn.dataset.id);
+        const ids = btn.dataset.ids.split(',');
+        const msg = ids.length > 1
+          ? `Remove this order? It has ${ids.length} size lines — all of them will be deleted. This cannot be undone.`
+          : 'Remove this order? This cannot be undone.';
+        if(confirm(msg)){
+          await Promise.all(ids.map(id => ZgobStore.deleteOrder(id)));
           renderAll();
         }
       });
     });
+  }
+
+  // Opens a printable Job Order Receipt for one customer's order (every size line from
+  // the same submission, as a single receipt). The name on the receipt is the sender /
+  // customer who placed the order, not the individual size lines.
+  function printJobOrderReceipt(group, inventory){
+    const primary = group[0];
+    const lines = group.map(o => Object.assign({}, o, getLineAmounts(o, inventory)));
+    const totalQty = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+    const grandTotal = lines.reduce((s, l) => s + l.total, 0);
+    const receiptNo = (primary.order_group_id || primary.id).replace(/-/g, '').slice(0, 8).toUpperCase();
+    const issued = new Date();
+
+    const rowsHtml = lines.map(l => `
+      <tr>
+        <td>${zgobEscape(l.size)}</td>
+        <td style="text-align:center;">${l.quantity}</td>
+        <td style="text-align:right;">₱${l.unit.toFixed(2)}</td>
+        <td style="text-align:right;">₱${l.total.toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Job Order Receipt — ${zgobEscape(receiptNo)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Courier New', 'Space Mono', monospace; color:#121212; background:#fff; max-width:480px; margin:24px auto; padding:0 16px; font-size:13px; }
+  h1 { font-size:18px; margin:0 0 2px; letter-spacing:.04em; }
+  .sub { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#666; margin-bottom:18px; }
+  .row { display:flex; justify-content:space-between; padding:4px 0; }
+  .cut { border-top:1px dashed #999; margin:14px 0; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th, td { padding:6px 4px; text-align:left; border-bottom:1px solid #ddd; font-size:12px; }
+  th { text-transform:uppercase; font-size:10px; letter-spacing:.05em; color:#666; }
+  tfoot td { border-bottom:none; border-top:2px solid #121212; font-weight:bold; padding-top:10px; }
+  .label { color:#666; }
+  .btn-print { display:block; width:100%; margin-top:22px; padding:10px; background:#121212; color:#fff; border:none; font-family:inherit; font-size:13px; cursor:pointer; text-transform:uppercase; letter-spacing:.06em; }
+  @media print { .btn-print { display:none; } body { margin:0 auto; } }
+</style>
+</head>
+<body>
+  <h1>Zgob Apparel</h1>
+  <div class="sub">Job Order Receipt</div>
+
+  <div class="row"><span class="label">Receipt No.</span><span>${zgobEscape(receiptNo)}</span></div>
+  <div class="row"><span class="label">Order date</span><span>${zgobEscape(zgobFormatDate(primary.created_at))}</span></div>
+  <div class="row"><span class="label">Printed</span><span>${zgobEscape(issued.toLocaleString())}</span></div>
+  <div class="row"><span class="label">Status</span><span>${zgobEscape(primary.status)}</span></div>
+
+  <div class="cut"></div>
+
+  <div class="row"><span class="label">Customer</span><span>${zgobEscape(primary.name)}</span></div>
+  <div class="row"><span class="label">Email</span><span>${zgobEscape(primary.email)}</span></div>
+  <div class="row"><span class="label">Garment</span><span>${zgobEscape(primary.garment)} · ${zgobEscape(primary.color)}</span></div>
+  <div class="row"><span class="label">Placement</span><span>${zgobEscape(primary.placement || '—')}</span></div>
+  ${primary.design_text ? `<div class="row"><span class="label">Design text</span><span>"${zgobEscape(primary.design_text)}"</span></div>` : ''}
+  ${primary.notes ? `<div class="row" style="flex-direction:column;"><span class="label">Notes</span><span>${zgobEscape(primary.notes)}</span></div>` : ''}
+
+  <div class="cut"></div>
+
+  <table>
+    <thead>
+      <tr><th>Size</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Unit price</th><th style="text-align:right;">Line total</th></tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+    <tfoot>
+      <tr><td colspan="1">Total qty</td><td style="text-align:center;">${totalQty}</td><td colspan="2" style="text-align:right;">₱${grandTotal.toFixed(2)}</td></tr>
+    </tfoot>
+  </table>
+
+  <div class="cut"></div>
+  <p style="font-size:11px; color:#666;">Thank you for ordering with Zgob Apparel. This receipt reflects the price at the time the order was placed.</p>
+
+  <button class="btn-print" onclick="window.print()">Print receipt</button>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank', 'width=520,height=760');
+    if(!w){ zgobToast('Please allow pop-ups to print the receipt.'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
   }
 
   /* ---------------- analytics ---------------- */

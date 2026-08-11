@@ -673,7 +673,12 @@
         : baseNotes;
 
       // one order row per size — each keeps its own quantity and its own unit price
-      // (sizes past XL carry the ₱40 extended-size surcharge on top of the base price)
+      // (sizes past XL carry the ₱40 extended-size surcharge on top of the base price).
+      // All rows from this submission share an orderGroupId so the admin panel can treat
+      // them as a single job order / receipt even though they're stored as separate rows.
+      const orderGroupId = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
       for(const { size, qty } of sizeQtys){
         const unitPrice = computeUnitPriceForSize(size);
         const order = {
@@ -689,7 +694,8 @@
           referenceMockupUrl,
           notes,
           unitPrice,
-          totalPrice: unitPrice * qty
+          totalPrice: unitPrice * qty,
+          orderGroupId
         };
         await ZgobStore.addOrder(order);
       }
