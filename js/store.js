@@ -89,7 +89,7 @@ const ZgobStore = (() => {
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
     async addOrder(order){
-      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, referenceMockupUrl, notes }
+      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, referenceMockupUrl, notes, unitPrice, totalPrice }
       const row = {
         name: order.name,
         email: order.email,
@@ -101,9 +101,18 @@ const ZgobStore = (() => {
         design_text: order.designText || null,
         artwork_url: order.artworkUrl || null,
         reference_mockup_url: order.referenceMockupUrl || null,
-        notes: order.notes || null
+        notes: order.notes || null,
+        unit_price: order.unitPrice ?? null,
+        total_price: order.totalPrice ?? null
       };
-      return orThrow(await client.from('orders').insert(row).select().single());
+      // Anonymous visitors can INSERT here (RLS: "anyone can submit an order")
+      // but cannot SELECT rows back (that's admin-only). Chaining .select()
+      // after insert() asks PostgREST to read the row back before returning,
+      // which RLS then blocks for a logged-out visitor — so the insert
+      // actually succeeds but the call still throws. Just insert; nothing
+      // downstream needs the returned row.
+      const { error } = await client.from('orders').insert(row);
+      if(error) throw error;
     },
     async setOrderStatus(id, status){
       orThrow(await client.from('orders').update({ status }).eq('id', id));
@@ -117,9 +126,12 @@ const ZgobStore = (() => {
       return orThrow(await client.from('messages').select('*').order('created_at', { ascending:false }));
     },
     async addMessage(msg){
-      return orThrow(await client.from('messages').insert({
+      // Same reasoning as addOrder above: anon can insert but not select
+      // messages back, so don't chain .select().single() here.
+      const { error } = await client.from('messages').insert({
         name: msg.name, email: msg.email, subject: msg.subject, message: msg.message
-      }).select().single());
+      });
+      if(error) throw error;
     },
     async markMessageRead(id, isRead){
       orThrow(await client.from('messages').update({ read: isRead }).eq('id', id));

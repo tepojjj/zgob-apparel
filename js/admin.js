@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginError = document.getElementById('loginError');
   let designsCache = []; // must be declared before the first render can run
   let inventoryCache = []; // kept in sync so the design form can look up live garment prices
+  let analyticsOrders = []; // raw orders, re-filtered locally whenever the range buttons change
+  let analyticsInventory = []; // for estimating revenue on pre-price-tracking orders
+  let currentAnalyticsRange = '30';
 
   // design form fields — declared up here (rather than down near the rest of the
   // designs code) because the very first dashboard render can populate/read them
@@ -77,6 +80,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  document.querySelectorAll('.analytics-range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.analytics-range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentAnalyticsRange = btn.dataset.range;
+      renderAnalytics(analyticsOrders, analyticsInventory);
+    });
+  });
+
   try{
     if(await ZgobStore.isLoggedIn()) await showDashboard();
   }catch(err){
@@ -111,8 +123,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [orders, inventory, designs, messages] = await Promise.all([
       ZgobStore.getOrders(), ZgobStore.getInventory(), ZgobStore.getDesigns(), ZgobStore.getMessages()
     ]);
+    analyticsOrders = orders;
+    analyticsInventory = inventory;
     renderStats(orders, inventory, messages);
     renderOrders(orders);
+    renderAnalytics(orders, inventory);
     renderInventory(inventory);
     renderDesigns(designs);
     renderMessages(messages);
@@ -171,6 +186,186 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
     });
+  }
+
+  /* ---------------- analytics ---------------- */
+
+  // The order's revenue: use the price captured at order time if we have it (unit_price/
+  // total_price were added after launch), otherwise fall back to estimating from the
+  // garment's current inventory price — flagged so the dashboard can disclose the estimate.
+  function getOrderRevenue(order, inventory){
+    if(order.total_price != null) return { amount: Number(order.total_price), estimated: false };
+    const item = inventory.find(i => i.name === order.garment);
+    const price = item ? Number(item.price) : 0;
+    return { amount: price * (Number(order.quantity) || 0), estimated: true };
+  }
+
+  function filterOrdersByRange(orders, range){
+    if(range === 'all') return orders;
+    const cutoff = Date.now() - Number(range) * 24 * 60 * 60 * 1000;
+    return orders.filter(o => new Date(o.created_at).getTime() >= cutoff);
+  }
+
+  function bucketKeyFor(dateStr, granularity){
+    const d = new Date(dateStr);
+    if(granularity === 'day') return d.toISOString().slice(0, 10);
+    if(granularity === 'week'){
+      const ws = new Date(d); ws.setHours(0,0,0,0); ws.setDate(ws.getDate() - ws.getDay());
+      return ws.toISOString().slice(0, 10);
+    }
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function bucketLabelFor(key, granularity){
+    if(granularity === 'month'){
+      const [y, m] = key.split('-');
+      return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+    }
+    return new Date(key + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  // Builds the ordered sequence of bucket keys to show on the x-axis, including buckets
+  // with zero orders, so gaps in activity show as gaps rather than being skipped over.
+  function buildBucketSequence(granularity, count, earliestOrderDate){
+    const now = new Date();
+    const keys = [];
+    if(granularity === 'day'){
+      for(let i = count - 1; i >= 0; i--){
+        const d = new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate() - i);
+        keys.push(d.toISOString().slice(0, 10));
+      }
+    }else if(granularity === 'week'){
+      const ws0 = new Date(now); ws0.setHours(0,0,0,0); ws0.setDate(ws0.getDate() - ws0.getDay());
+      for(let i = count - 1; i >= 0; i--){
+        const d = new Date(ws0); d.setDate(d.getDate() - i * 7);
+        keys.push(d.toISOString().slice(0, 10));
+      }
+    }else{
+      const start = count
+        ? new Date(now.getFullYear(), now.getMonth() - (count - 1), 1)
+        : new Date((earliestOrderDate || now).getFullYear(), (earliestOrderDate || now).getMonth(), 1);
+      const cursor = new Date(start);
+      while(cursor <= now){
+        keys.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    }
+    return keys;
+  }
+
+  function renderRevenueChart(filteredOrders, inventory){
+    const container = document.getElementById('revenueChart');
+    if(!filteredOrders.length){
+      container.innerHTML = '<div class="bar-chart-empty">No orders in this range yet.</div>';
+      return;
+    }
+
+    let granularity, count;
+    if(currentAnalyticsRange === '30'){ granularity = 'day'; count = 30; }
+    else if(currentAnalyticsRange === '90'){ granularity = 'week'; count = 13; }
+    else if(currentAnalyticsRange === '365'){ granularity = 'month'; count = 12; }
+    else { granularity = 'month'; count = null; }
+
+    let earliest = null;
+    filteredOrders.forEach(o => {
+      const d = new Date(o.created_at);
+      if(!earliest || d < earliest) earliest = d;
+    });
+
+    const keys = buildBucketSequence(granularity, count, earliest);
+    const revenueByKey = new Map(keys.map(k => [k, 0]));
+    filteredOrders.forEach(o => {
+      const key = bucketKeyFor(o.created_at, granularity);
+      if(revenueByKey.has(key)){
+        revenueByKey.set(key, revenueByKey.get(key) + getOrderRevenue(o, inventory).amount);
+      }
+    });
+
+    const max = Math.max(...revenueByKey.values(), 1);
+    container.innerHTML = `<div class="bar-chart">${keys.map(k => {
+      const v = revenueByKey.get(k);
+      const pct = v > 0 ? Math.max((v / max) * 100, 4) : 0;
+      return `<div class="bar-chart-col" title="₱${v.toFixed(2)}">
+        <div class="bar-chart-bar" style="height:0%" data-final="${pct}"></div>
+        <div class="bar-chart-label">${bucketLabelFor(k, granularity)}</div>
+      </div>`;
+    }).join('')}</div>`;
+
+    requestAnimationFrame(() => {
+      container.querySelectorAll('.bar-chart-bar').forEach(el => { el.style.height = el.dataset.final + '%'; });
+    });
+  }
+
+  function renderStatusChart(statusCounts, total){
+    const container = document.getElementById('statusChart');
+    if(!total){
+      container.innerHTML = '<div class="bar-chart-empty">No orders in this range yet.</div>';
+      return;
+    }
+    const rows = [
+      { key: 'new', label: 'New' },
+      { key: 'progress', label: 'In progress' },
+      { key: 'done', label: 'Fulfilled' }
+    ];
+    container.innerHTML = rows.map(r => {
+      const count = statusCounts[r.key] || 0;
+      const pct = total ? (count / total) * 100 : 0;
+      return `<div class="status-bar-row">
+        <span class="status-bar-label">${r.label}</span>
+        <div class="status-bar-track"><div class="status-bar-fill ${r.key}" style="width:0%" data-final="${pct}"></div></div>
+        <span class="status-bar-count">${count}</span>
+      </div>`;
+    }).join('');
+    requestAnimationFrame(() => {
+      container.querySelectorAll('.status-bar-fill').forEach(el => { el.style.width = el.dataset.final + '%'; });
+    });
+  }
+
+  function renderTopGarments(garmentStats){
+    const body = document.getElementById('topGarmentsBody');
+    const rows = Object.entries(garmentStats)
+      .map(([name, s]) => ({ name, ...s }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
+    document.getElementById('topGarmentsEmpty').style.display = rows.length ? 'none' : 'block';
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td>${zgobEscape(r.name)}</td>
+        <td>${r.orders}</td>
+        <td>${r.units}</td>
+        <td>₱${r.revenue.toFixed(2)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function renderAnalytics(orders, inventory){
+    const filtered = filterOrdersByRange(orders, currentAnalyticsRange);
+
+    let revenue = 0, units = 0, estimatedUsed = false;
+    const statusCounts = { new: 0, progress: 0, done: 0 };
+    const garmentStats = {};
+
+    filtered.forEach(o => {
+      const { amount, estimated } = getOrderRevenue(o, inventory);
+      revenue += amount;
+      if(estimated) estimatedUsed = true;
+      units += Number(o.quantity) || 0;
+      statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
+      if(!garmentStats[o.garment]) garmentStats[o.garment] = { orders: 0, units: 0, revenue: 0 };
+      garmentStats[o.garment].orders += 1;
+      garmentStats[o.garment].units += Number(o.quantity) || 0;
+      garmentStats[o.garment].revenue += amount;
+    });
+
+    document.getElementById('statRevenue').textContent = `₱${revenue.toFixed(2)}`;
+    document.getElementById('statOrderCount').textContent = filtered.length;
+    document.getElementById('statAvgOrder').textContent = `₱${(filtered.length ? revenue / filtered.length : 0).toFixed(2)}`;
+    document.getElementById('statUnitsSold').textContent = units;
+    document.getElementById('analyticsEstimateNote').style.display = estimatedUsed ? 'block' : 'none';
+
+    renderRevenueChart(filtered, inventory);
+    renderStatusChart(statusCounts, filtered.length);
+    renderTopGarments(garmentStats);
   }
 
   function renderInventory(inventory){

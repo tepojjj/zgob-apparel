@@ -63,11 +63,15 @@ create table if not exists public.orders (
   reference_mockup_url text,  -- a finished mockup/reference image the customer already had and uploaded as-is
   notes        text,
   status       text not null default 'new' check (status in ('new','progress','done')),
+  unit_price   numeric,  -- price per item at the moment the order was placed (nullable: orders placed before this column existed won't have it)
+  total_price  numeric,  -- unit_price * quantity, captured at order time so later price/inventory edits don't rewrite past sales history
   created_at   timestamptz not null default now()
 );
 
 -- migration for projects that ran an earlier version of this schema before this column existed:
 alter table public.orders add column if not exists reference_mockup_url text;
+alter table public.orders add column if not exists unit_price numeric;
+alter table public.orders add column if not exists total_price numeric;
 
 create table if not exists public.messages (
   id          uuid primary key default gen_random_uuid(),

@@ -34,7 +34,7 @@
     </div>
   </section>
 
-  <section class="section-light" style="padding-top:50px;">
+  <section class="reveal section-light" style="padding-top:50px;">
     <div class="wrap customize-layout">
 
       <!-- LIVE PREVIEW -->
@@ -394,6 +394,17 @@
     }));
   }
 
+  /** The per-unit price for whatever's currently selected — same logic renderPreview()
+      uses to fill in #previewPrice, pulled out so the order submit handler can save the
+      exact price the customer saw rather than recomputing (and risking drift) later. */
+  function computeUnitPrice(){
+    if(state.useDesignPhoto && state.designPhotoUrl){
+      return state.garment.price;
+    }
+    const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.photoIndex);
+    return (photoConfig && photoConfig.quad && photoConfig.extraPrice > 0) ? photoConfig.extraPrice : state.garment.price;
+  }
+
   function renderPreview(){
     const hint = document.getElementById('printAreaHint');
 
@@ -413,7 +424,7 @@
 
     if(state.useDesignPhoto && state.designPhotoUrl){
       const qty = Number(document.getElementById('quantity').value) || 1;
-      document.getElementById('previewPrice').textContent = `₱${(state.garment.price * qty).toFixed(2)}`;
+      document.getElementById('previewPrice').textContent = `₱${(computeUnitPrice() * qty).toFixed(2)}`;
       showRealPhoto(state.designPhotoUrl, 'Photo-realistic preview');
       hint.style.display = 'none';
       renderPhotoThumbs(null);
@@ -427,10 +438,7 @@
     renderPhotoThumbs(photos);
 
     const qty = Number(document.getElementById('quantity').value) || 1;
-    // this photo's own price, if the admin set one, IS the total the customer pays for this look —
-    // it does not add on top of the garment's base price. Leaving it unset (0) just falls back to the base price.
-    const photoPrice = (photoConfig && photoConfig.quad && photoConfig.extraPrice > 0) ? photoConfig.extraPrice : state.garment.price;
-    document.getElementById('previewPrice').textContent = `₱${(photoPrice * qty).toFixed(2)}`;
+    document.getElementById('previewPrice').textContent = `₱${(computeUnitPrice() * qty).toFixed(2)}`;
 
     if(!photoConfig || !photoConfig.quad){
       // no real photo for this garment at all yet — nothing to composite onto
@@ -614,18 +622,22 @@
       const referenceMockupUrl = state.referenceMockupFile
         ? await ZgobStore.uploadArtwork(state.referenceMockupFile, `reference_${state.referenceMockupFile.name}`)
         : null;
+      const qty = Number(document.getElementById('quantity').value) || 1;
+      const unitPrice = computeUnitPrice();
       const order = {
         name: fullName,
         email,
         garment: state.garment.name,
         color: state.color.name,
         size: document.getElementById('size').value,
-        quantity: Number(document.getElementById('quantity').value) || 1,
+        quantity: qty,
         placement: document.getElementById('placement').value,
         designText: document.getElementById('designText').value.trim(),
         artworkUrl,
         referenceMockupUrl,
-        notes: document.getElementById('notes').value.trim()
+        notes: document.getElementById('notes').value.trim(),
+        unitPrice,
+        totalPrice: unitPrice * qty
       };
       await ZgobStore.addOrder(order);
       zgobToast('Order sent! We\'ll follow up by email to confirm your proof.');
