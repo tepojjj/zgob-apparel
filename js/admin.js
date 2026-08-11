@@ -178,6 +178,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { unit, total: unit * (Number(o.quantity) || 0), estimated: true };
   }
 
+  // Sequential receipt numbers (JO-000123) are assigned server-side per submission (see
+  // customize.html + next_receipt_no() in schema.sql) and are admin-editable afterwards.
+  // Orders placed before this existed fall back to a short id-based number so every
+  // order still shows something in that column.
+  function displayReceiptNo(primary){
+    if(primary.receipt_no) return primary.receipt_no;
+    return 'JO-' + (primary.order_group_id || primary.id).replace(/-/g, '').slice(0, 6).toUpperCase();
+  }
+
   function renderOrders(orders, inventory){
     const body = document.getElementById('ordersBody');
     document.getElementById('ordersEmpty').style.display = orders.length ? 'none' : 'block';
@@ -194,6 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const anyEstimated = lines.some(l => l.estimated);
       const sizesSummary = lines.map(l => `${l.size} ×${l.quantity}`).join(', ');
       const ids = group.map(o => o.id).join(',');
+      const receiptNo = displayReceiptNo(primary);
 
       const detailRows = lines.map(l => `
         <tr>
@@ -206,6 +216,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       return `
       <tr>
+        <td>
+          <input type="text" class="order-receipt-no" data-ids="${ids}" value="${zgobEscape(receiptNo)}"
+            style="font-family:'Space Mono',monospace; font-size:12px; width:100px; background:transparent; border:1px solid var(--line-dark); border-radius:2px; padding:5px 6px; color:inherit;">
+        </td>
         <td>${zgobFormatDate(primary.created_at)}</td>
         <td>
           <div>${zgobEscape(primary.name)}</div>
@@ -241,8 +255,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         </td>
       </tr>
       <tr class="order-detail-row" id="order-detail-${key}" style="display:none;">
-        <td colspan="8" style="background:var(--ink-2);">
-          <div style="font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--graphite); margin:6px 0 8px 26px;">Full order breakdown</div>
+        <td colspan="9" style="background:rgba(20,18,13,0.04);">
+          <div class="graphite-text" style="font-family:'Space Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin:10px 0 8px 26px;">Full order breakdown</div>
           <table style="width:100%;">
             <thead>
               <tr>
@@ -262,6 +276,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
     }).join('');
 
+    body.querySelectorAll('.order-receipt-no').forEach(input => {
+      const commit = async () => {
+        const ids = input.dataset.ids.split(',');
+        const value = input.value.trim();
+        try{
+          await Promise.all(ids.map(id => ZgobStore.setReceiptNo(id, value)));
+          zgobToast('Receipt number updated.');
+        }catch(err){
+          zgobToast('Could not update the receipt number.');
+          console.error(err);
+        }
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => {
+        if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+      });
+    });
     body.querySelectorAll('.toggle-order-details').forEach(btn => {
       btn.addEventListener('click', () => {
         const row = document.getElementById('order-detail-' + btn.dataset.key);
@@ -306,7 +337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lines = group.map(o => Object.assign({}, o, getLineAmounts(o, inventory)));
     const totalQty = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
     const grandTotal = lines.reduce((s, l) => s + l.total, 0);
-    const receiptNo = (primary.order_group_id || primary.id).replace(/-/g, '').slice(0, 8).toUpperCase();
+    const receiptNo = displayReceiptNo(primary);
     const issued = new Date();
 
     const rowsHtml = lines.map(l => `

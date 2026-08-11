@@ -66,6 +66,7 @@ create table if not exists public.orders (
   unit_price   numeric,  -- price per item at the moment the order was placed (nullable: orders placed before this column existed won't have it)
   total_price  numeric,  -- unit_price * quantity, captured at order time so later price/inventory edits don't rewrite past sales history
   order_group_id uuid,   -- shared by every size line submitted together on one order form, so the admin panel can show them as a single job order (nullable: rows placed before this column existed won't have it)
+  receipt_no   text,     -- sequential job-order/receipt number (e.g. "JO-000123"), assigned once per submission via next_receipt_no() below and shared by every size line in that submission; editable by admins afterwards
   created_at   timestamptz not null default now()
 );
 
@@ -74,6 +75,26 @@ alter table public.orders add column if not exists reference_mockup_url text;
 alter table public.orders add column if not exists unit_price numeric;
 alter table public.orders add column if not exists total_price numeric;
 alter table public.orders add column if not exists order_group_id uuid;
+alter table public.orders add column if not exists receipt_no text;
+
+-- Sequential job-order / receipt numbers. next_receipt_no() is called once per order
+-- submission (not once per size line) so every line in the same job order shares one
+-- number. It's security definer so the public "anon" role can call it (to number new
+-- orders as they come in) without being granted direct access to the sequence — and
+-- admins can still freely edit/blank out the stored receipt_no per order afterwards,
+-- e.g. after a cancellation, without that affecting the sequence itself.
+create sequence if not exists public.orders_receipt_seq start with 1;
+
+create or replace function public.next_receipt_no()
+returns text
+language sql
+security definer
+set search_path = public
+as $$
+  select 'JO-' || lpad(nextval('public.orders_receipt_seq')::text, 6, '0');
+$$;
+
+grant execute on function public.next_receipt_no() to anon, authenticated;
 
 create table if not exists public.messages (
   id          uuid primary key default gen_random_uuid(),

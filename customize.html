@@ -674,11 +674,20 @@
 
       // one order row per size — each keeps its own quantity and its own unit price
       // (sizes past XL carry the ₱40 extended-size surcharge on top of the base price).
-      // All rows from this submission share an orderGroupId so the admin panel can treat
-      // them as a single job order / receipt even though they're stored as separate rows.
+      // All rows from this submission share an orderGroupId AND a receiptNo so the admin
+      // panel can treat them as a single job order / receipt even though they're stored
+      // as separate rows. Both are requested once per submission, not once per size.
       const orderGroupId = (window.crypto && crypto.randomUUID)
         ? crypto.randomUUID()
         : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      let receiptNo = null;
+      try{
+        receiptNo = await ZgobStore.getNextReceiptNo();
+      }catch(err){
+        // Non-fatal: the admin panel falls back to a short id-based receipt number
+        // for any order that doesn't have a sequential one.
+        console.error('Could not get a receipt number:', err);
+      }
       for(const { size, qty } of sizeQtys){
         const unitPrice = computeUnitPriceForSize(size);
         const order = {
@@ -695,7 +704,8 @@
           notes,
           unitPrice,
           totalPrice: unitPrice * qty,
-          orderGroupId
+          orderGroupId,
+          receiptNo
         };
         await ZgobStore.addOrder(order);
       }

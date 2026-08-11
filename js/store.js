@@ -92,8 +92,16 @@ const ZgobStore = (() => {
       if(upload.error) throw upload.error;
       return client.storage.from('artwork').getPublicUrl(path).data.publicUrl;
     },
+    /** Gets the next sequential job-order/receipt number (e.g. "JO-000123"). Call this
+        once per order submission — every size line in that submission should share the
+        same number — not once per line. */
+    async getNextReceiptNo(){
+      const { data, error } = await client.rpc('next_receipt_no');
+      if(error) throw error;
+      return data;
+    },
     async addOrder(order){
-      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, referenceMockupUrl, notes, unitPrice, totalPrice, orderGroupId }
+      // order: { name, email, garment, color, size, quantity, placement, designText, artworkUrl, referenceMockupUrl, notes, unitPrice, totalPrice, orderGroupId, receiptNo }
       const row = {
         name: order.name,
         email: order.email,
@@ -110,7 +118,8 @@ const ZgobStore = (() => {
         total_price: order.totalPrice ?? null,
         // shared across every size line from the same submission, so the admin panel
         // can regroup them into a single job order / receipt
-        order_group_id: order.orderGroupId || null
+        order_group_id: order.orderGroupId || null,
+        receipt_no: order.receiptNo || null
       };
       // Anonymous visitors can INSERT here (RLS: "anyone can submit an order")
       // but cannot SELECT rows back (that's admin-only). Chaining .select()
@@ -123,6 +132,11 @@ const ZgobStore = (() => {
     },
     async setOrderStatus(id, status){
       orThrow(await client.from('orders').update({ status }).eq('id', id));
+    },
+    /** Admin-editable receipt number — lets staff correct/renumber a job order, e.g.
+        after a cancellation, without touching the underlying sequence. */
+    async setReceiptNo(id, receiptNo){
+      orThrow(await client.from('orders').update({ receipt_no: receiptNo || null }).eq('id', id));
     },
     async deleteOrder(id){
       orThrow(await client.from('orders').delete().eq('id', id));
