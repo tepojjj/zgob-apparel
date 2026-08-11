@@ -142,8 +142,8 @@ const ZgobStore = (() => {
     },
     /** Add a reference photo for a garment. Multiple photos per garment are allowed (e.g. front/back, different angles) —
         this always inserts a new row rather than replacing an existing one. quad = [[x,y]x4] print-area corners, auto-computed
-        (no manual calibration step). extraPrice is an optional surcharge added on top of the garment's base price when a
-        shopper's preview uses this particular photo. `color` is kept for schema compatibility but is always "White". */
+        (no manual calibration step). extraPrice, if set, IS the total price a customer pays for this specific look —
+        it replaces the garment's base inventory price rather than adding to it. Leave it at 0 to just use the base price. */
     async addGarmentPhoto({ garment, color, imageUrl, quad, extraPrice }){
       return orThrow(await client.from('garment_photos')
         .insert({ garment, color: color || 'White', image_url: imageUrl, quad: quad || null, extra_price: extraPrice || 0 })
@@ -161,7 +161,7 @@ const ZgobStore = (() => {
         .update(patch)
         .eq('id', id).select().single());
     },
-    /** Update just the surcharge on an existing reference photo. */
+    /** Update just the price on an existing reference photo. */
     async updateGarmentPhotoPrice(id, extraPrice){
       return orThrow(await client.from('garment_photos')
         .update({ extra_price: extraPrice || 0 })

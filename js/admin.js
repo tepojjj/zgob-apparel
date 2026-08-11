@@ -244,6 +244,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   designCancelEditBtn.addEventListener('click', resetDesignForm);
 
+  // matches every design whose title exactly matches an inventory item's name (case/whitespace-insensitive)
+  // to that item at ₱0 markup, so its price is always identical to — and stays in sync with — the Inventory price.
+  // Designs with no exact-name match (different wording, ambiguous duplicates, etc.) are left alone for manual
+  // linking via Edit, since guessing wrong would silently mis-price a design.
+  document.getElementById('bulkLinkDesignsBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('bulkLinkDesignsBtn');
+    btn.disabled = true;
+    btn.textContent = 'Linking…';
+    let linked = 0, skipped = 0;
+    try{
+      for(const d of designsCache){
+        if(d.garment_id) continue; // already linked — leave as-is
+        const match = inventoryCache.find(i => i.name.trim().toLowerCase() === d.title.trim().toLowerCase());
+        if(!match){ skipped++; continue; }
+        await ZgobStore.updateDesign(d.id, {
+          title: d.title, category: d.category, colorway: d.colorway,
+          price: match.price, garmentId: match.id, markup: 0,
+          tags: d.tags, swatch: d.swatch, imageUrl: d.image_url, artworkUrl: d.artwork_url
+        });
+        linked++;
+      }
+      zgobToast(skipped
+        ? `Linked ${linked} design${linked===1?'':'s'} automatically. ${skipped} need${skipped===1?'s':''} a manual match — their title doesn't exactly match an Inventory item name. Edit each one and pick from "Match to inventory garment".`
+        : `Linked ${linked} design${linked===1?'':'s'} automatically — every design now matches its Inventory price.`);
+      renderAll();
+    }catch(err){
+      zgobToast('Something went wrong linking designs.');
+      console.error(err);
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Link all designs to matching Inventory items (₱0 markup) →';
+    }
+  });
+
   designSaveBtn.addEventListener('click', async () => {
     const title = designTitle.value.trim();
     const category = designCategory.value.trim();

@@ -427,8 +427,10 @@
     renderPhotoThumbs(photos);
 
     const qty = Number(document.getElementById('quantity').value) || 1;
-    const extraPrice = (photoConfig && photoConfig.quad) ? (photoConfig.extraPrice || 0) : 0;
-    document.getElementById('previewPrice').textContent = `₱${((state.garment.price + extraPrice) * qty).toFixed(2)}`;
+    // this photo's own price, if the admin set one, IS the total the customer pays for this look —
+    // it does not add on top of the garment's base price. Leaving it unset (0) just falls back to the base price.
+    const photoPrice = (photoConfig && photoConfig.quad && photoConfig.extraPrice > 0) ? photoConfig.extraPrice : state.garment.price;
+    document.getElementById('previewPrice').textContent = `₱${(photoPrice * qty).toFixed(2)}`;
 
     if(!photoConfig || !photoConfig.quad){
       // no real photo for this garment at all yet — nothing to composite onto

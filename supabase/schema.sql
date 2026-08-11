@@ -85,7 +85,7 @@ create table if not exists public.garment_photos (
   color       text not null default 'White',  -- always "White" — every reference photo is a plain white garment
   image_url   text not null,  -- real reference photo of the blank garment
   quad        jsonb,          -- [[x,y],[x,y],[x,y],[x,y]] print-area corners (TL,TR,BR,BL) in the photo's own pixel space — auto-computed, no manual calibration needed
-  extra_price numeric not null default 0,  -- optional surcharge added on top of the garment's base price when this reference photo is the one in use
+  extra_price numeric not null default 0,  -- if set (>0), this IS the total price a customer pays for this specific look; it replaces the garment's base price rather than adding to it. 0 = just use the garment's base inventory price.
   created_at  timestamptz not null default now()
 );
 

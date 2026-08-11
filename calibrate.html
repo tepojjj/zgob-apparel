@@ -75,9 +75,9 @@
         </div>
 
         <div class="form-field" style="margin-top:16px;">
-          <label for="extraPrice">Extra price for this photo (optional)</label>
+          <label for="extraPrice">Price for this look (optional)</label>
           <input type="number" id="extraPrice" min="0" step="0.01" value="0">
-          <p class="graphite-text" style="font-size:11px; margin-top:6px;">Added on top of the garment's base price whenever a customer's preview uses this specific photo — e.g. for a pricier angle, fabric, or finish.</p>
+          <p class="graphite-text" style="font-size:11px; margin-top:6px;">This is the exact total a customer pays when their preview uses this photo — it replaces the garment's base price, it doesn't add to it. Leave at 0 to just use the garment's base price from Inventory.</p>
           <p style="font-size:12px; margin-top:8px; font-family:'Space Mono',monospace;">Customer will see: <strong id="extraPriceTotal">₱0.00</strong> <span class="graphite-text" id="extraPriceBreakdown"></span></p>
         </div>
 
@@ -121,15 +121,17 @@
 
   let inventoryCache = [];
 
-  // shows the *actual total* a customer will see for the currently selected garment —
-  // base inventory price + this photo's surcharge — right next to the surcharge field,
-  // so it's obvious this isn't a standalone price
+  // shows the *actual total* a customer will see for the currently selected garment.
+  // a set price (>0) IS the total; 0/blank just falls back to the garment's own base price.
   function updateExtraPriceTotal(){
     const item = inventoryCache.find(i => i.name === garmentSelect.value);
     const base = item ? Number(item.price) : 0;
-    const extra = Number(extraPriceInput.value) || 0;
-    extraPriceTotal.textContent = `₱${(base + extra).toFixed(2)}`;
-    extraPriceBreakdown.textContent = item ? `(₱${base.toFixed(2)} base + ₱${extra.toFixed(2)} extra)` : '(no matching inventory item — base counted as ₱0)';
+    const entered = Number(extraPriceInput.value) || 0;
+    const total = entered > 0 ? entered : base;
+    extraPriceTotal.textContent = `₱${total.toFixed(2)}`;
+    extraPriceBreakdown.textContent = entered > 0
+      ? '(this price, set directly)'
+      : (item ? `(using ${garmentSelect.value}'s base price — no price set for this photo)` : '(no matching inventory item — base counted as ₱0)');
   }
   extraPriceInput.addEventListener('input', updateExtraPriceTotal);
   garmentSelect.addEventListener('change', updateExtraPriceTotal);
@@ -278,7 +280,7 @@
                   <input type="number" min="0" step="0.01" class="price-input" data-id="${row.id}" value="${row.extra_price || 0}">
                   <button class="icon-btn save-price" data-id="${row.id}">Save price</button>
                 </div>
-                <p class="graphite-text" style="font-size:11px; margin-top:4px;">Customer sees: ₱${(( (inventoryCache.find(i=>i.name===garment)||{}).price || 0) + Number(row.extra_price || 0)).toFixed(2)} total</p>
+                <p class="graphite-text" style="font-size:11px; margin-top:4px;">Customer sees: ₱${(Number(row.extra_price) > 0 ? Number(row.extra_price) : ((inventoryCache.find(i=>i.name===garment)||{}).price || 0)).toFixed(2)} total</p>
                 <div class="ref-card-actions">
                   <button class="icon-btn edit-ref" data-id="${row.id}" data-garment="${garment}" data-price="${row.extra_price || 0}" data-url="${row.image_url}">Edit</button>
                   <button class="icon-btn delete-ref" data-id="${row.id}">Delete</button>
@@ -304,7 +306,9 @@
         const note = input.closest('.ref-card-body').querySelector('p.graphite-text');
         const garment = input.closest('.ref-card-body').querySelector('.edit-ref')?.dataset.garment;
         const base = (inventoryCache.find(i => i.name === garment) || {}).price || 0;
-        if(note) note.textContent = `Customer sees: ₱${(Number(base) + (Number(input.value) || 0)).toFixed(2)} total`;
+        const entered = Number(input.value) || 0;
+        const total = entered > 0 ? entered : base;
+        if(note) note.textContent = `Customer sees: ₱${total.toFixed(2)} total`;
       });
     });
     groupsEl.querySelectorAll('.save-price').forEach(btn => {
