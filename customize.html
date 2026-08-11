@@ -67,8 +67,8 @@
             <strong id="previewGarmentName">Classic Tee</strong>
           </div>
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">SIZE</span>
-            <strong id="previewSize">M</strong>
+            <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">SIZES</span>
+            <strong id="previewSize">M ×1</strong>
           </div>
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
             <span class="graphite-text" style="font-family:'Space Mono',monospace; font-size:12px;">PLACEMENT</span>
@@ -92,18 +92,11 @@
         <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">01 · Garment</h3>
         <div class="chip-group" id="garmentPicker" style="margin:14px 0 26px;"></div>
 
-        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">02 · Size &amp; quantity</h3>
-        <div class="form-row" style="margin-bottom:26px;">
-          <div class="form-field" style="margin-bottom:0;">
-            <label for="size">Size</label>
-            <select id="size" required>
-              <option>S</option><option selected>M</option><option>L</option><option>XL</option><option>XXL</option>
-            </select>
-          </div>
-          <div class="form-field" style="margin-bottom:0;">
-            <label for="quantity">Quantity</label>
-            <input type="number" id="quantity" min="1" max="500" value="1" required>
-          </div>
+        <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">02 · Sizes &amp; quantities</h3>
+        <div class="form-field" style="margin-bottom:26px;">
+          <div id="sizeQtyGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(90px,1fr)); gap:10px;"></div>
+          <p class="graphite-text" style="font-size:12px; margin-top:10px;">Sizes above XL add <strong>₱40.00</strong> per item on top of the base price. Enter a quantity for every size you need — leave the rest at 0.</p>
+          <p id="sizeQtyError" class="graphite-text" style="font-size:12px; margin-top:6px; color:var(--thread); display:none;">Enter a quantity for at least one size.</p>
         </div>
 
         <h3 style="font-size:15px; letter-spacing:.08em; color:var(--graphite);">03 · Your design</h3>
@@ -218,6 +211,43 @@
     'Back, full':       { x:72,  y:86,  w:156, h:150 },
     'Sleeve':            { x:214, y:78,  w:42,  h:42  },
   };
+
+  // Sizes offered, in ascending order — anything past 'XL' in this list carries the extended-size surcharge.
+  const SIZE_ORDER = ['S','M','L','XL','XXL'];
+  const EXTENDED_SIZE_SURCHARGE = 40; // ₱ added per item for any size beyond XL
+
+  function isExtendedSize(size){
+    const i = SIZE_ORDER.indexOf(size);
+    return i > SIZE_ORDER.indexOf('XL');
+  }
+
+  function renderSizeQtyGrid(preserveValues){
+    const grid = document.getElementById('sizeQtyGrid');
+    const existing = {};
+    if(preserveValues !== false){
+      grid.querySelectorAll('.size-qty-input').forEach(inp => { existing[inp.dataset.size] = inp.value; });
+    }
+    grid.innerHTML = SIZE_ORDER.map(sz => `
+      <div class="form-field" style="margin-bottom:0;">
+        <label for="sizeQty_${sz}">${sz}${isExtendedSize(sz) ? ' <span class="graphite-text">(+₱' + EXTENDED_SIZE_SURCHARGE.toFixed(0) + ')</span>' : ''}</label>
+        <input type="number" id="sizeQty_${sz}" class="size-qty-input" data-size="${sz}" min="0" max="500" value="${existing[sz] ?? (sz === 'M' ? 1 : 0)}">
+      </div>
+    `).join('');
+    grid.querySelectorAll('.size-qty-input').forEach(inp => inp.addEventListener('input', renderPreview));
+  }
+
+  /** Every size the shopper entered a quantity greater than 0 for. */
+  function getSelectedSizeQuantities(){
+    return Array.from(document.querySelectorAll('.size-qty-input'))
+      .map(inp => ({ size: inp.dataset.size, qty: Math.max(0, Number(inp.value) || 0) }))
+      .filter(row => row.qty > 0);
+  }
+
+  /** Per-unit price for a specific size — the garment/photo's base price, plus the
+      extended-size surcharge if this size is past XL. */
+  function computeUnitPriceForSize(size){
+    return computeUnitPrice() + (isExtendedSize(size) ? EXTENDED_SIZE_SURCHARGE : 0);
+  }
 
   // pre-fill from the hero's live preview (index.html) or a "Use this design" link (designs.html)
   const params = new URLSearchParams(location.search);
@@ -415,16 +445,21 @@
     updatePrintArea();
 
     document.getElementById('previewGarmentName').textContent = state.garment.name;
-    document.getElementById('previewSize').textContent = document.getElementById('size').value;
+    const sizeQtys = getSelectedSizeQuantities();
+    const totalUnits = sizeQtys.reduce((sum, r) => sum + r.qty, 0);
+    document.getElementById('previewSize').textContent = sizeQtys.length
+      ? sizeQtys.map(r => `${r.size} ×${r.qty}`).join(', ')
+      : '—';
     document.getElementById('previewPlacement').textContent = document.getElementById('placement').value;
 
     // any change invalidates whatever real photo was showing before
     if(state.lastMockupBlobUrl){ URL.revokeObjectURL(state.lastMockupBlobUrl); state.lastMockupBlobUrl = null; }
     mockupGenerationId++; // invalidate any in-flight generation from before this change
 
+    const totalPrice = sizeQtys.reduce((sum, r) => sum + computeUnitPriceForSize(r.size) * r.qty, 0);
+
     if(state.useDesignPhoto && state.designPhotoUrl){
-      const qty = Number(document.getElementById('quantity').value) || 1;
-      document.getElementById('previewPrice').textContent = `₱${(computeUnitPrice() * qty).toFixed(2)}`;
+      document.getElementById('previewPrice').textContent = `₱${totalPrice.toFixed(2)}`;
       showRealPhoto(state.designPhotoUrl, 'Photo-realistic preview');
       hint.style.display = 'none';
       renderPhotoThumbs(null);
@@ -437,8 +472,7 @@
     const photoConfig = zgobFindGarmentPhoto(state.garment.name, state.photoIndex);
     renderPhotoThumbs(photos);
 
-    const qty = Number(document.getElementById('quantity').value) || 1;
-    document.getElementById('previewPrice').textContent = `₱${(computeUnitPrice() * qty).toFixed(2)}`;
+    document.getElementById('previewPrice').textContent = `₱${totalPrice.toFixed(2)}`;
 
     if(!photoConfig || !photoConfig.quad){
       // no real photo for this garment at all yet — nothing to composite onto
@@ -470,8 +504,6 @@
     leaveDesignPhotoMode();
     renderPreview();
   });
-  document.getElementById('size').addEventListener('change', renderPreview);
-  document.getElementById('quantity').addEventListener('input', renderPreview);
   document.getElementById('placement').addEventListener('change', () => { leaveDesignPhotoMode(); renderPreview(); });
   document.getElementById('artwork').addEventListener('change', e => {
     if(state.artworkUrl) URL.revokeObjectURL(state.artworkUrl);
@@ -605,6 +637,7 @@
   });
 
   renderGarmentPicker();
+  renderSizeQtyGrid();
   renderPreview();
 
   formEl.addEventListener('submit', async (e) => {
@@ -612,6 +645,15 @@
     const fullName = document.getElementById('fullName').value.trim();
     const email = document.getElementById('email').value.trim();
     if(!fullName || !email){ zgobToast('Please add your name and email.'); return; }
+
+    const sizeQtys = getSelectedSizeQuantities();
+    const sizeQtyError = document.getElementById('sizeQtyError');
+    if(!sizeQtys.length){
+      sizeQtyError.style.display = 'block';
+      document.getElementById('sizeQtyGrid').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    sizeQtyError.style.display = 'none';
 
     const submitBtn = formEl.querySelector('button[type=submit]');
     submitBtn.disabled = true;
@@ -622,24 +664,35 @@
       const referenceMockupUrl = state.referenceMockupFile
         ? await ZgobStore.uploadArtwork(state.referenceMockupFile, `reference_${state.referenceMockupFile.name}`)
         : null;
-      const qty = Number(document.getElementById('quantity').value) || 1;
-      const unitPrice = computeUnitPrice();
-      const order = {
-        name: fullName,
-        email,
-        garment: state.garment.name,
-        color: state.color.name,
-        size: document.getElementById('size').value,
-        quantity: qty,
-        placement: document.getElementById('placement').value,
-        designText: document.getElementById('designText').value.trim(),
-        artworkUrl,
-        referenceMockupUrl,
-        notes: document.getElementById('notes').value.trim(),
-        unitPrice,
-        totalPrice: unitPrice * qty
-      };
-      await ZgobStore.addOrder(order);
+      const baseNotes = document.getElementById('notes').value.trim();
+      // when more than one size is ordered, note the full breakdown on every row so whichever
+      // order the admin looks at first, they can see it was part of the same multi-size submission
+      const sizeBreakdown = sizeQtys.map(r => `${r.size} ×${r.qty}`).join(', ');
+      const notes = sizeQtys.length > 1
+        ? [baseNotes, `Part of a multi-size order: ${sizeBreakdown}.`].filter(Boolean).join('\n\n')
+        : baseNotes;
+
+      // one order row per size — each keeps its own quantity and its own unit price
+      // (sizes past XL carry the ₱40 extended-size surcharge on top of the base price)
+      for(const { size, qty } of sizeQtys){
+        const unitPrice = computeUnitPriceForSize(size);
+        const order = {
+          name: fullName,
+          email,
+          garment: state.garment.name,
+          color: state.color.name,
+          size,
+          quantity: qty,
+          placement: document.getElementById('placement').value,
+          designText: document.getElementById('designText').value.trim(),
+          artworkUrl,
+          referenceMockupUrl,
+          notes,
+          unitPrice,
+          totalPrice: unitPrice * qty
+        };
+        await ZgobStore.addOrder(order);
+      }
       zgobToast('Order sent! We\'ll follow up by email to confirm your proof.');
       formEl.reset();
       state.text = '';
@@ -652,6 +705,7 @@
       document.getElementById('artworkFileName').textContent = '';
       document.getElementById('referenceMockupFileName').style.display = 'none';
       document.getElementById('referenceMockupFileName').textContent = '';
+      renderSizeQtyGrid(false);
       showBuiltPreview();
       renderPreview();
       window.scrollTo({ top: 0, behavior: 'smooth' });
