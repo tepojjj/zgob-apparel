@@ -121,13 +121,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   async function renderAll(){
-    const [orders, inventory, designs, messages] = await Promise.all([
-      ZgobStore.getOrders(), ZgobStore.getInventory(), ZgobStore.getDesigns(), ZgobStore.getMessages()
+    const [orders, inventory, designs, messages, voidedReceipts] = await Promise.all([
+      ZgobStore.getOrders(), ZgobStore.getInventory(), ZgobStore.getDesigns(), ZgobStore.getMessages(), ZgobStore.getVoidedReceipts()
     ]);
     analyticsOrders = orders;
     analyticsInventory = inventory;
     renderStats(orders, inventory, messages);
     renderOrders(orders, inventory);
+    renderCancelled(voidedReceipts);
     renderAnalytics(orders, inventory);
     renderInventory(inventory);
     renderDesigns(designs);
@@ -251,7 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td style="display:flex; flex-direction:column; gap:6px;">
           <button class="icon-btn toggle-order-details" data-key="${key}">Details</button>
           <button class="icon-btn print-order-receipt" data-key="${key}">Receipt</button>
-          <button class="icon-btn delete-order" data-ids="${ids}">Delete</button>
+          <button class="icon-btn delete-order" data-ids="${ids}" data-key="${key}">Delete</button>
         </td>
       </tr>
       <tr class="order-detail-row" id="order-detail-${key}" style="display:none;">
@@ -318,16 +319,81 @@ document.addEventListener('DOMContentLoaded', async () => {
     body.querySelectorAll('.delete-order').forEach(btn => {
       btn.addEventListener('click', async () => {
         const ids = btn.dataset.ids.split(',');
+        const group = orderGroupsCache.find(g => g[0].id === btn.dataset.key);
+        const primary = group ? group[0] : null;
+        const receiptNo = primary ? displayReceiptNo(primary) : null;
         const msg = ids.length > 1
           ? `Remove this order? It has ${ids.length} size lines — all of them will be deleted. This cannot be undone.`
           : 'Remove this order? This cannot be undone.';
-        if(confirm(msg)){
-          await Promise.all(ids.map(id => ZgobStore.deleteOrder(id)));
+        if(!confirm(msg)) return;
+
+        // Log why this receipt number no longer has an order attached, so the gap
+        // in the numbering is explained rather than just disappearing.
+        const remarks = prompt(
+          `Optional: why is ${receiptNo || 'this order'} being cancelled? (e.g. "Customer cancelled", "Duplicate order")\nLeave blank to skip the note.`,
+          ''
+        );
+        if(remarks !== null && receiptNo){
+          try{
+            await ZgobStore.addVoidedReceipt(receiptNo, primary ? primary.name : null, remarks.trim() || null);
+          }catch(err){
+            console.error('Failed to log the voided receipt:', err);
+          }
+        }
+
+        await Promise.all(ids.map(id => ZgobStore.deleteOrder(id)));
+        renderAll();
+      });
+    });
+  }
+
+  function renderCancelled(voidedReceipts){
+    const body = document.getElementById('cancelledBody');
+    document.getElementById('cancelledEmpty').style.display = voidedReceipts.length ? 'none' : 'block';
+    body.innerHTML = voidedReceipts.map(v => `
+      <tr>
+        <td>${zgobEscape(v.receipt_no)}</td>
+        <td>${zgobEscape(v.customer_name || '—')}</td>
+        <td style="white-space:normal; max-width:320px;">${zgobEscape(v.remarks || '—')}</td>
+        <td>${zgobFormatDate(v.voided_at)}</td>
+        <td><button class="icon-btn delete-voided" data-id="${v.id}">Remove</button></td>
+      </tr>
+    `).join('');
+    body.querySelectorAll('.delete-voided').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(confirm('Remove this log entry? This cannot be undone.')){
+          await ZgobStore.deleteVoidedReceipt(btn.dataset.id);
           renderAll();
         }
       });
     });
   }
+
+  const cancelledPanel = document.getElementById('cancelledPanel');
+  const viewCancelledBtn = document.getElementById('viewCancelledBtn');
+  viewCancelledBtn.addEventListener('click', () => {
+    const showing = cancelledPanel.style.display !== 'none';
+    cancelledPanel.style.display = showing ? 'none' : 'block';
+    viewCancelledBtn.textContent = showing ? 'Cancelled / voided receipts' : 'Hide cancelled / voided receipts';
+  });
+
+  document.getElementById('resetReceiptSeqBtn').addEventListener('click', async () => {
+    const ok = confirm(
+      'Reset job order numbering to JO-000001?\n\nThis is meant for testing — the next order placed on the site will get JO-000001, and so on from there. It does NOT change the receipt numbers on any orders already saved.\n\nUse this right before you publish, not after you have real customer orders.'
+    );
+    if(!ok) return;
+    const btn = document.getElementById('resetReceiptSeqBtn');
+    btn.disabled = true;
+    try{
+      await ZgobStore.resetReceiptSequence(1);
+      zgobToast('Job order numbering reset — the next new order will be JO-000001.');
+    }catch(err){
+      zgobToast('Could not reset the numbering.');
+      console.error(err);
+    }finally{
+      btn.disabled = false;
+    }
+  });
 
   // Opens a printable Job Order Receipt for one customer's order (every size line from
   // the same submission, as a single receipt). The name on the receipt is the sender /

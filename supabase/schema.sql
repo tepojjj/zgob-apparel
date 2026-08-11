@@ -96,6 +96,32 @@ $$;
 
 grant execute on function public.next_receipt_no() to anon, authenticated;
 
+-- Lets an admin restart numbering (e.g. resetting to JO-000001 before going live after
+-- testing) without touching any orders already saved. Restricted to signed-in admins —
+-- anonymous/public visitors can request the *next* number (above) but never reset it.
+create or replace function public.reset_receipt_seq(start_at integer default 1)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  select setval('public.orders_receipt_seq', start_at, false);
+$$;
+
+revoke all on function public.reset_receipt_seq(integer) from public;
+grant execute on function public.reset_receipt_seq(integer) to authenticated;
+
+-- A lightweight log of cancelled/voided job orders, so a gap in the receipt numbering
+-- (e.g. JO-000002 missing) has a visible reason attached instead of just vanishing.
+-- Written right before the corresponding order rows are deleted.
+create table if not exists public.voided_receipts (
+  id            uuid primary key default gen_random_uuid(),
+  receipt_no    text not null,
+  customer_name text,
+  remarks       text,
+  voided_at     timestamptz not null default now()
+);
+
 create table if not exists public.messages (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
@@ -135,6 +161,7 @@ alter table public.inventory enable row level security;
 alter table public.orders    enable row level security;
 alter table public.messages  enable row level security;
 alter table public.garment_photos enable row level security;
+alter table public.voided_receipts enable row level security;
 
 -- designs: everyone can browse, only admins manage the catalogue
 drop policy if exists "designs are publicly readable" on public.designs;
@@ -211,6 +238,13 @@ create policy "garment photos are publicly readable"
 drop policy if exists "admins manage garment photos" on public.garment_photos;
 create policy "admins manage garment photos"
   on public.garment_photos for all
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
+
+-- voided_receipts: fully admin-only — this is an internal log, not customer-facing
+drop policy if exists "admins manage voided receipts" on public.voided_receipts;
+create policy "admins manage voided receipts"
+  on public.voided_receipts for all
   using (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');
 

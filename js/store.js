@@ -142,6 +142,33 @@ const ZgobStore = (() => {
       orThrow(await client.from('orders').delete().eq('id', id));
     },
 
+    /* ---------------- voided receipts (cancellation log) ---------------- */
+    async getVoidedReceipts(){
+      return orThrow(await client.from('voided_receipts').select('*').order('voided_at', { ascending:false }));
+    },
+    /** Logs why a job order's receipt number no longer exists (e.g. the customer
+        cancelled) — called right before the order rows themselves are deleted, so the
+        gap in numbering has a visible reason attached. */
+    async addVoidedReceipt(receiptNo, customerName, remarks){
+      const { error } = await client.from('voided_receipts').insert({
+        receipt_no: receiptNo,
+        customer_name: customerName || null,
+        remarks: remarks || null
+      });
+      if(error) throw error;
+    },
+    async deleteVoidedReceipt(id){
+      orThrow(await client.from('voided_receipts').delete().eq('id', id));
+    },
+
+    /** Restarts the job-order/receipt sequence — e.g. resetting to JO-000001 before
+        going live, after testing. Doesn't touch any orders already saved. Admin-only
+        (enforced by the reset_receipt_seq() function's grants in Supabase). */
+    async resetReceiptSequence(startAt = 1){
+      const { error } = await client.rpc('reset_receipt_seq', { start_at: startAt });
+      if(error) throw error;
+    },
+
     /* ---------------- messages ---------------- */
     async getMessages(){
       return orThrow(await client.from('messages').select('*').order('created_at', { ascending:false }));

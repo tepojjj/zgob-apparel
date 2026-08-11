@@ -76,6 +76,28 @@
 
       <!-- ORDERS -->
       <div class="admin-panel active" id="tab-orders">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px; margin-bottom:18px;">
+          <div>
+            <button type="button" class="btn btn-small" id="viewCancelledBtn">Cancelled / voided receipts</button>
+          </div>
+          <div style="text-align:right;">
+            <button type="button" class="btn btn-small" id="resetReceiptSeqBtn" style="border-color:var(--thread); color:var(--thread);">Reset job order numbers →</button>
+            <p class="graphite-text" style="font-size:11px; margin-top:6px; max-width:260px;">For testing only. Restarts the next receipt at JO-000001 — doesn't change any orders already saved.</p>
+          </div>
+        </div>
+
+        <div id="cancelledPanel" class="card" style="display:none; margin-bottom:22px;">
+          <h3 style="font-size:14px; margin-bottom:14px;">Cancelled / voided receipts</h3>
+          <p class="graphite-text" style="font-size:12px; margin-bottom:14px;">A log of job order numbers that no longer have an order attached, and why — so a gap in the numbering (e.g. JO-000002 missing) has a visible reason.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Receipt #</th><th>Customer</th><th>Remarks</th><th>Voided</th><th></th></tr></thead>
+              <tbody id="cancelledBody"></tbody>
+            </table>
+          </div>
+          <div id="cancelledEmpty" class="empty-state" style="display:none; margin-top:12px;">No cancelled orders logged yet.</div>
+        </div>
+
         <div class="table-wrap">
           <table>
             <thead>
