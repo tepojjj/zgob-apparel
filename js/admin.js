@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let analyticsOrders = []; // raw orders, re-filtered locally whenever the range buttons change
   let analyticsInventory = []; // for estimating revenue on pre-price-tracking orders
   let currentAnalyticsRange = '30';
+  let orderGroupsCache = []; // orders grouped into job orders, kept for the Receipt button's click handler
 
   // design form fields — declared up here (rather than down near the rest of the
   // designs code) because the very first dashboard render can populate/read them
@@ -176,8 +177,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const unit = item ? Number(item.price) : 0;
     return { unit, total: unit * (Number(o.quantity) || 0), estimated: true };
   }
-
-  let orderGroupsCache = [];
 
   function renderOrders(orders, inventory){
     const body = document.getElementById('ordersBody');
