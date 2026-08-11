@@ -603,6 +603,7 @@ tr:last-child td{ border-bottom:none; }
 .status-bar-fill.new{ background: var(--ink); }
 .status-bar-fill.progress{ background: var(--denim); }
 .status-bar-fill.done{ background: var(--graphite); }
+.status-bar-fill.cancelled{ background: var(--thread); }
 .status-bar-count{ width:28px; flex-shrink:0; text-align:right; font-family: var(--font-mono); font-size:12px; }
 
 .empty-state{

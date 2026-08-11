@@ -62,7 +62,7 @@ create table if not exists public.orders (
   artwork_url  text,
   reference_mockup_url text,  -- a finished mockup/reference image the customer already had and uploaded as-is
   notes        text,
-  status       text not null default 'new' check (status in ('new','progress','done')),
+  status       text not null default 'new' check (status in ('new','progress','done','cancelled')),
   unit_price   numeric,  -- price per item at the moment the order was placed (nullable: orders placed before this column existed won't have it)
   total_price  numeric,  -- unit_price * quantity, captured at order time so later price/inventory edits don't rewrite past sales history
   order_group_id uuid,   -- shared by every size line submitted together on one order form, so the admin panel can show them as a single job order (nullable: rows placed before this column existed won't have it)
@@ -76,6 +76,12 @@ alter table public.orders add column if not exists unit_price numeric;
 alter table public.orders add column if not exists total_price numeric;
 alter table public.orders add column if not exists order_group_id uuid;
 alter table public.orders add column if not exists receipt_no text;
+
+-- migration for projects that ran an earlier version of this schema, where the status
+-- check constraint didn't allow 'cancelled' yet:
+alter table public.orders drop constraint if exists orders_status_check;
+alter table public.orders add constraint orders_status_check
+  check (status in ('new','progress','done','cancelled'));
 
 -- Sequential job-order / receipt numbers. next_receipt_no() is called once per order
 -- submission (not once per size line) so every line in the same job order shares one
@@ -157,8 +163,9 @@ alter table public.garment_photos drop constraint if exists garment_photos_garme
 -- ---------------------------------------------------------
 -- STAFF ROLES
 -- Every signed-in admin-panel user is either 'admin' (full access) or
--- 'staff' (view + print only — no editing, no deleting, no access to
--- Analytics, Cancelled/voided receipts, or the job-order reset button).
+-- 'staff' (view, print, and update an order's status only — no editing
+-- other order fields, no deleting, no access to Analytics, Cancelled/voided
+-- receipts, or the job-order reset button).
 -- New signups default to 'staff' (fail-closed) — promote someone to
 -- admin manually, see the UPDATE statement below.
 -- ---------------------------------------------------------
@@ -266,7 +273,54 @@ create policy "admins manage inventory"
   using (public.is_admin())
   with check (public.is_admin());
 
--- orders: anyone can submit a custom order, only admins can view/manage the queue
+-- Staff are allowed to update an order row, but only its status (new/progress/
+-- done/cancelled) — every other column must come through unchanged. Admins are
+-- exempt and can edit anything (receipt_no, line details, etc). Enforced here
+-- with a trigger rather than RLS alone, since RLS can't restrict a policy to
+-- specific columns.
+create or replace function public.enforce_order_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.is_admin() then
+    return new;
+  end if;
+
+  if new.name is distinct from old.name
+     or new.email is distinct from old.email
+     or new.garment is distinct from old.garment
+     or new.color is distinct from old.color
+     or new.size is distinct from old.size
+     or new.quantity is distinct from old.quantity
+     or new.placement is distinct from old.placement
+     or new.design_text is distinct from old.design_text
+     or new.artwork_url is distinct from old.artwork_url
+     or new.reference_mockup_url is distinct from old.reference_mockup_url
+     or new.notes is distinct from old.notes
+     or new.unit_price is distinct from old.unit_price
+     or new.total_price is distinct from old.total_price
+     or new.order_group_id is distinct from old.order_group_id
+     or new.receipt_no is distinct from old.receipt_no
+     or new.created_at is distinct from old.created_at
+  then
+    raise exception 'Staff can only update order status';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists orders_enforce_staff_update on public.orders;
+create trigger orders_enforce_staff_update
+  before update on public.orders
+  for each row execute function public.enforce_order_update();
+
+-- orders: anyone can submit a custom order, admins + staff can view the queue,
+-- but only admins/staff who are signed in can update it (status only for staff,
+-- see the trigger above) — deleting stays admin-only.
 drop policy if exists "anyone can submit an order" on public.orders;
 create policy "anyone can submit an order"
   on public.orders for insert
@@ -277,10 +331,11 @@ create policy "admins manage orders"
   on public.orders for select using (auth.role() = 'authenticated');
 
 drop policy if exists "admins update orders" on public.orders;
-create policy "admins update orders"
+drop policy if exists "staff and admins update orders" on public.orders;
+create policy "staff and admins update orders"
   on public.orders for update
-  using (public.is_admin())
-  with check (public.is_admin());
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 drop policy if exists "admins delete orders" on public.orders;
 create policy "admins delete orders"

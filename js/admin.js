@@ -296,6 +296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <option value="new" ${primary.status==='new'?'selected':''}>New</option>
             <option value="progress" ${primary.status==='progress'?'selected':''}>In progress</option>
             <option value="done" ${primary.status==='done'?'selected':''}>Fulfilled</option>
+            <option value="cancelled" ${primary.status==='cancelled'?'selected':''}>Cancelled</option>
           </select>
         </td>
         <td style="display:flex; flex-direction:column; gap:6px;">
@@ -395,10 +396,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
-    // staff can view and print orders, but not edit or delete them
+    // staff can view, print, and update an order's status, but can't edit the
+    // receipt number or delete an order
     if(currentUserRole !== 'admin'){
       body.querySelectorAll('.order-receipt-no').forEach(el => el.disabled = true);
-      body.querySelectorAll('.order-status').forEach(el => el.disabled = true);
       body.querySelectorAll('.delete-order').forEach(el => el.style.display = 'none');
     }
   }
@@ -653,7 +654,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rows = [
       { key: 'new', label: 'New' },
       { key: 'progress', label: 'In progress' },
-      { key: 'done', label: 'Fulfilled' }
+      { key: 'done', label: 'Fulfilled' },
+      { key: 'cancelled', label: 'Cancelled' }
     ];
     container.innerHTML = rows.map(r => {
       const count = statusCounts[r.key] || 0;
@@ -690,7 +692,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const filtered = filterOrdersByRange(orders, currentAnalyticsRange);
 
     let revenue = 0, units = 0, estimatedUsed = false;
-    const statusCounts = { new: 0, progress: 0, done: 0 };
+    const statusCounts = { new: 0, progress: 0, done: 0, cancelled: 0 };
     const garmentStats = {};
 
     filtered.forEach(o => {
