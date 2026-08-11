@@ -77,7 +77,7 @@
         <div class="form-field" style="margin-top:16px;">
           <label for="extraPrice">Price for this look (optional)</label>
           <input type="number" id="extraPrice" min="0" step="0.01" value="0">
-          <p class="graphite-text" style="font-size:11px; margin-top:6px;">This is the exact total a customer pays when their preview uses this photo — it replaces the garment's base price, it doesn't add to it. Leave at 0 to just use the garment's base price from Inventory.</p>
+          <p class="graphite-text" style="font-size:11px; margin-top:6px;">This is the exact total a customer pays when their preview uses this photo — it replaces the garment's base price, it doesn't add to it. Saving a price above 0 also updates this garment's base price in Inventory, so it stays the same number everywhere — Inventory, this reference photo, and any design linked to this garment. Leave at 0 to just use the garment's current base price from Inventory instead.</p>
           <p style="font-size:12px; margin-top:8px; font-family:'Space Mono',monospace;">Customer will see: <strong id="extraPriceTotal">₱0.00</strong> <span class="graphite-text" id="extraPriceBreakdown"></span></p>
         </div>
 
@@ -201,18 +201,33 @@
     img.src = objectUrl;
   });
 
+  /* Keeps everything downstream of a reference photo's price in sync automatically:
+     if this photo carries an override (extraPrice > 0), that becomes the garment's
+     live inventory price too — so the Inventory tab, and any design linked to this
+     garment (price = inventory price + markup), update themselves without a separate
+     manual edit. A photo left at 0 (no override) doesn't touch inventory at all. */
+  async function syncInventoryPriceForGarment(garmentName, extraPrice){
+    if(!(extraPrice > 0)) return;
+    const item = inventoryCache.find(i => i.name === garmentName);
+    if(!item || Number(item.price) === Number(extraPrice)) return;
+    await ZgobStore.updateGarmentPrice(item.id, extraPrice);
+    item.price = extraPrice; // keep the local cache in step until the next full reload
+  }
+
   saveBtn.addEventListener('click', async () => {
     if(editingId){
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving…';
       setStatus('');
       try{
-        const patch = { garment: garmentSelect.value, extraPrice: Number(extraPriceInput.value) || 0 };
+        const extraPrice = Number(extraPriceInput.value) || 0;
+        const patch = { garment: garmentSelect.value, extraPrice };
         if(pickedFile && naturalWidth){
           patch.imageUrl = await ZgobStore.uploadGarmentPhoto(pickedFile);
           patch.quad = AUTO_QUAD_FRACTION.map(([fx, fy]) => [fx * naturalWidth, fy * naturalHeight]);
         }
         await ZgobStore.updateGarmentPhoto(editingId, patch);
+        await syncInventoryPriceForGarment(garmentSelect.value, extraPrice);
         setStatus('Saved changes.');
         resetForm();
         renderGroups();
@@ -230,6 +245,7 @@
     saveBtn.textContent = 'Saving…';
     setStatus('');
     try{
+      const extraPrice = Number(extraPriceInput.value) || 0;
       const imageUrl = await ZgobStore.uploadGarmentPhoto(pickedFile);
       const quad = AUTO_QUAD_FRACTION.map(([fx, fy]) => [fx * naturalWidth, fy * naturalHeight]);
       await ZgobStore.addGarmentPhoto({
@@ -237,8 +253,9 @@
         color: REFERENCE_COLOR,
         imageUrl,
         quad,
-        extraPrice: Number(extraPriceInput.value) || 0
+        extraPrice
       });
+      await syncInventoryPriceForGarment(garmentSelect.value, extraPrice);
       setStatus(`Saved — ${garmentSelect.value} now has a new reference photo on Customize.`);
       resetForm();
       renderGroups();
@@ -314,12 +331,15 @@
     groupsEl.querySelectorAll('.save-price').forEach(btn => {
       btn.addEventListener('click', async () => {
         const input = groupsEl.querySelector(`.price-input[data-id="${btn.dataset.id}"]`);
+        const garment = input.closest('.ref-card-body').querySelector('.edit-ref')?.dataset.garment;
+        const extraPrice = Number(input.value) || 0;
         btn.disabled = true;
         btn.textContent = 'Saving…';
         try{
-          await ZgobStore.updateGarmentPhotoPrice(btn.dataset.id, Number(input.value) || 0);
+          await ZgobStore.updateGarmentPhotoPrice(btn.dataset.id, extraPrice);
+          await syncInventoryPriceForGarment(garment, extraPrice);
           btn.textContent = 'Saved ✓';
-          setTimeout(() => { btn.textContent = 'Save price'; btn.disabled = false; }, 1200);
+          setTimeout(() => { btn.textContent = 'Save price'; btn.disabled = false; renderGroups(); }, 1200);
         }catch(err){
           btn.textContent = 'Save price';
           btn.disabled = false;

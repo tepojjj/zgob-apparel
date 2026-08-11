@@ -388,7 +388,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       return `
         <tr>
           <td><strong>${zgobEscape(item.name)}</strong><div class="graphite-text" style="font-size:12px;">${zgobEscape(item.category)}</div></td>
-          <td>₱${Number(item.price).toFixed(2)}</td>
+          <td>
+            <input type="number" min="0" step="0.01" value="${Number(item.price).toFixed(2)}" data-id="${item.id}"
+              class="price-input" style="width:76px; padding:6px 8px; font-family:'Space Mono',monospace; font-size:13px;
+              background:var(--ink-2); color:var(--canvas); border:1px solid var(--line); border-radius:2px;">
+          </td>
           ${sizeKeys.map(sz => `
             <td>
               <input type="number" min="0" value="${item.sizes[sz] ?? 0}" data-id="${item.id}" data-size="${sz}"
@@ -405,6 +409,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       input.addEventListener('change', async () => {
         await ZgobStore.updateStock(input.dataset.id, input.dataset.size, input.value);
         zgobToast('Inventory updated.');
+        renderAll();
+      });
+    });
+    body.querySelectorAll('.price-input').forEach(input => {
+      input.addEventListener('change', async () => {
+        await ZgobStore.updateGarmentPrice(input.dataset.id, input.value);
+        zgobToast('Price updated.');
         renderAll();
       });
     });

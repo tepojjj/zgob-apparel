@@ -75,6 +75,10 @@ const ZgobStore = (() => {
       const sizes = Object.assign({}, item.sizes, { [size]: Math.max(0, Number(newCount) || 0) });
       orThrow(await client.from('inventory').update({ sizes }).eq('id', garmentId));
     },
+    /** Update a garment's base inventory price. */
+    async updateGarmentPrice(garmentId, newPrice){
+      orThrow(await client.from('inventory').update({ price: Math.max(0, Number(newPrice) || 0) }).eq('id', garmentId));
+    },
 
     /* ---------------- orders ---------------- */
     async getOrders(){
